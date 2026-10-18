@@ -1,19 +1,21 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { authorizeRequest, requestUrl, requestFailure } from './request-policy.js';
 
 const workerPath = fileURLToPath(new URL('./curl-cffi-worker.py', import.meta.url));
 
 /** Optional HTTP transport retaining browser-compatible TLS and HTTP fingerprints. */
 export function createBrowserCompatibleFetch({
   command = 'uv', args = ['run', '--with', 'curl_cffi==0.16.3', 'python'],
-  timeoutMs = 60000, maxResponseBytes = 64 * 1024 * 1024
+  timeoutMs = 60000, maxResponseBytes = 64 * 1024 * 1024, authorizePost
 } = {}) {
   return async function browserCompatibleFetch(input, init = {}) {
-    const method = String(init.method ?? 'GET').toUpperCase();
-    if (!['GET', 'HEAD'].includes(method)) throw new Error('Only GET and HEAD requests are supported');
+    const url = requestUrl(input);
+    const { method, body } = authorizeRequest(input, init, url, authorizePost);
     if (init.signal?.aborted) throw new Error('Browser-compatible request was aborted');
     const request = {
-      url: String(input), method, headers: Object.fromEntries(new Headers(init.headers)),
+      url: url.toString(), method, headers: Object.fromEntries(new Headers(init.headers)),
+      ...(method === 'POST' ? { body, authorizedPost: true } : {}),
       timeout: Math.max(1, Math.floor(timeoutMs / 1000))
     };
     const result = await new Promise((resolve, reject) => {
@@ -45,9 +47,12 @@ export function createBrowserCompatibleFetch({
       });
       child.stdin.end(JSON.stringify(request));
     });
+    if (method === 'POST' && result.status >= 300 && result.status < 400) {
+      throw requestFailure('POST redirects are not allowed');
+    }
     try {
-      const body = method === 'HEAD' || [204, 205, 304].includes(result.status) ? null : Buffer.from(result.body, 'base64');
-      const response = new Response(body, { status: result.status, headers: result.headers });
+      const responseBody = method === 'HEAD' || [204, 205, 304].includes(result.status) ? null : Buffer.from(result.body, 'base64');
+      const response = new Response(responseBody, { status: result.status, headers: result.headers });
       Object.defineProperty(response, 'url', { value: result.url });
       return response;
     } catch { throw new Error('Invalid browser-compatible response'); }

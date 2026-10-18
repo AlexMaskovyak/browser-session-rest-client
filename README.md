@@ -12,10 +12,14 @@ An injected transport performs GET/HEAD with the browser's authenticated request
 
 `createAuthenticatedFetch({ origin, headers })` accepts explicitly supplied runtime headers and returns a Fetch-compatible function. It permits GET/HEAD to that exact origin and follows only same-origin redirects. `createFetchTransport(fetch)` adapts it for the collector. `readCredentialsFromStdin()` reads bounded JSON containing `origin`, `headers`, and any caller-owned runtime configuration; it never writes or logs the input. Supply credentials through a private stdin pipe, never command arguments or a manifest.
 
+For a known read-only API query that requires POST, both Fetch factories accept `authorizePost({ url, body })`. The caller's synchronous predicate must verify the exact endpoint and query body and return `true`. POST requires an explicit string body of at most 1 MiB; Request body streams and all POST redirects are rejected. Pass the guard to both factories when composing them. Other methods remain disabled, and artifact manifests remain GET/HEAD only.
+
 Some authenticated services reject ordinary HTTP stacks while accepting browser requests. `createBrowserCompatibleFetch()` provides an optional `curl_cffi` worker with a Chrome TLS and HTTP fingerprint. Inject it as `fetchImpl` into `createAuthenticatedFetch` to retain the same origin and redirect restrictions. It runs `uv run --with curl_cffi==0.16.3 python` by default; an existing environment can use `{ command: pythonExecutable, args: [] }`. Requests pass through stdin, responses through captured stdout, and no credential files are created. `uv` and Python are required only for this optional transport.
 
 Direct HTTP transports require Node 18 or newer. The storage-state adapter loads Playwright only when selected; current Playwright releases require Node 20 or newer. Direct transports do not load Playwright.
 
 Install from the repository's Git URL. Install the optional `playwright-core` peer dependency only when using a Playwright adapter. The package is MIT licensed; npm registry publication is currently disabled.
+
+Run `npm test` for the JavaScript suite and `npm run test:worker` for the Python worker tests.
 
 See [the implementation plan](PLAN.md).

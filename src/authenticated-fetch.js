@@ -20,19 +20,16 @@ function validatedHeaders(value) {
 }
 
 /** Credentials are supplied by the caller and retained only in this closure. */
-export function createAuthenticatedFetch({ origin, headers, fetchImpl = globalThis.fetch, maxRedirects = 5 }) {
+export function createAuthenticatedFetch({ origin, headers, fetchImpl = globalThis.fetch, maxRedirects = 5, authorizePost }) {
   const allowedOrigin = validatedOrigin(origin);
   const authentication = validatedHeaders(headers);
   if (typeof fetchImpl !== 'function') throw failure('A Fetch implementation is required');
   if (!Number.isSafeInteger(maxRedirects) || maxRedirects < 0 || maxRedirects > 20) throw failure('Invalid redirect limit');
 
   return async function authenticatedFetch(input, init = {}) {
-    let url;
-    try { url = new URL(input instanceof Request ? input.url : input); }
-    catch { throw failure('Invalid request URL'); }
-    const method = String(init.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
-    if (method !== 'GET' && method !== 'HEAD') throw failure('Only GET and HEAD requests are supported');
-    if (init.body != null) throw failure('Read-only requests must not contain a body');
+    let url = requestUrl(input);
+    if (url.origin !== allowedOrigin) throw failure('Request origin is not allowed');
+    const { method, body } = authorizeRequest(input, init, url, authorizePost);
     let requestHeaders;
     try { requestHeaders = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined)); }
     catch { throw failure('Invalid request headers'); }
@@ -44,9 +41,14 @@ export function createAuthenticatedFetch({ origin, headers, fetchImpl = globalTh
       try {
         response = await fetchImpl(url.toString(), {
           method, headers: requestHeaders, redirect: 'manual',
+          ...(method === 'POST' ? { body } : {}),
           signal: init.signal ?? (input instanceof Request ? input.signal : undefined)
         });
       } catch { throw new Error('Authenticated request failed'); }
+      if (method === 'POST' && response.status >= 300 && response.status < 400) {
+        await response.body?.cancel().catch(() => {});
+        throw failure('POST redirects are not allowed');
+      }
       if (!redirects.has(response.status)) return response;
       const location = response.headers.get('location');
       await response.body?.cancel();
@@ -83,3 +85,4 @@ export async function readCredentialsFromStdin(stream = process.stdin, { maxByte
   validatedHeaders(configuration.headers);
   return configuration;
 }
+import { authorizeRequest, requestUrl } from './request-policy.js';

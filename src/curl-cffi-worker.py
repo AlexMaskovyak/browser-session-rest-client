@@ -10,12 +10,21 @@ def main():
 
     configuration = json.load(sys.stdin)
     method = configuration["method"]
-    if method not in {"GET", "HEAD"}:
+    body = configuration.get("body")
+    if method == "POST":
+        if (
+            configuration.get("authorizedPost") is not True
+            or not isinstance(body, str)
+            or len(body.encode("utf-8")) > 1024 * 1024
+        ):
+            raise ValueError("POST request is not authorized")
+    elif method not in {"GET", "HEAD"} or body is not None:
         raise ValueError("Unsupported method")
     response = requests.request(
         method,
         configuration["url"],
         headers=configuration["headers"],
+        **({"data": body.encode("utf-8")} if method == "POST" else {}),
         timeout=configuration["timeout"],
         impersonate="chrome",
         default_headers=False,
