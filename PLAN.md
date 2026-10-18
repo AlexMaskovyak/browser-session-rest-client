@@ -13,6 +13,8 @@ Build a read-only artifact client around an authenticated Playwright request con
 - [x] Add optional browser-compatible HTTP transport for sessions rejected by ordinary HTTP stacks.
 - [x] Test private subprocess input, binary responses, failures, and cancellation.
 - [x] Load Playwright only when its storage-state adapter is selected; verify direct transports on Node 18.
+- [x] Close manifest path and URL-redaction gaps; test synthetic secret-bearing URLs.
+- [ ] Package public source with a permissive license and optional Playwright dependency; verify strict Node 18 consumption.
 
 Authentication remains in the browser context or process memory. The caller owns credential capture; this package owns request restrictions and collection. Runtime headers flow through an injected Fetch adapter; manifests and ledgers contain no headers. Cross-origin redirects fail before another request is sent. Authentication failures return their HTTP status; transport failures expose no underlying error text. Recovery uses a fresh credential handoff and the existing verified resume ledger.
 

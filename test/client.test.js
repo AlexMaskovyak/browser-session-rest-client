@@ -22,12 +22,17 @@ test('direct transport imports do not load optional Playwright', async () => {
 test('rejects duplicate ids, unsafe paths, mutations, and secret fields', () => {
   assert.throws(() => validateManifest({ version: 1, artifacts: [artifact, artifact] }), /Duplicate/);
   assert.throws(() => validateManifest({ version: 1, artifacts: [{ ...artifact, filename: '../x' }] }), /Unsafe/);
+  for (const filename of ['.', '..', 'sub\\file.pdf', 'sub/file.pdf', 'bad\0.pdf']) {
+    assert.throws(() => validateManifest({ version: 1, artifacts: [{ ...artifact, filename }] }), /Unsafe/);
+  }
   assert.throws(() => validateManifest({ version: 1, artifacts: [{ ...artifact, method: 'POST' }] }), /Unsupported/);
   assert.throws(() => validateManifest({ version: 1, cookie: 'secret', artifacts: [] }), /Secret-bearing/);
 });
 
 test('redacts sensitive query values', () => {
   assert.equal(redactUrl(artifact.url), 'https://example.test/file?role_id=REDACTED');
+  const url = 'https://synthetic:synthetic@example.test/file?cookie=synthetic&csrf=synthetic&password=synthetic&session=synthetic&credential=synthetic&date=2026-01-01#synthetic';
+  assert.equal(redactUrl(url), 'https://example.test/file?cookie=REDACTED&csrf=REDACTED&password=REDACTED&session=REDACTED&credential=REDACTED&date=2026-01-01');
 });
 
 test('downloads atomically and resumes a verified artifact', async () => {

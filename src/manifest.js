@@ -15,7 +15,8 @@ export function validateManifest(manifest) {
     if (!artifact.url || !URL.canParse(artifact.url)) throw new Error(`Invalid URL for ${artifact.id}`);
     const method = artifact.method ?? 'GET';
     if (!['GET', 'HEAD'].includes(method)) throw new Error(`Unsupported method for ${artifact.id}: ${method}`);
-    if (!artifact.filename || path.basename(artifact.filename) !== artifact.filename) {
+    if (typeof artifact.filename !== 'string' || !artifact.filename || ['.', '..'].includes(artifact.filename)
+      || /[/\\\0]/.test(artifact.filename) || path.basename(artifact.filename) !== artifact.filename) {
       throw new Error(`Unsafe filename for ${artifact.id}`);
     }
   }
@@ -32,9 +33,13 @@ function rejectSecrets(value, key = '') {
 
 export function redactUrl(rawUrl) {
   const url = new URL(rawUrl);
-  for (const key of url.searchParams.keys()) {
-    if (/(auth|key|role|secret|signature|token)/i.test(key)) url.searchParams.set(key, 'REDACTED');
+  url.username = '';
+  url.password = '';
+  url.hash = '';
+  for (const key of [...url.searchParams.keys()]) {
+    if (/(auth|cookie|credential|csrf|key|password|role|secret|session|signature|storage.?state|token)/i.test(key)) {
+      url.searchParams.set(key, 'REDACTED');
+    }
   }
   return url.toString();
 }
-
