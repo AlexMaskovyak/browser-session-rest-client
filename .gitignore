@@ -4,4 +4,4 @@ coverage/
 *.storage-state.json
 staging/
 results.json
-
+__pycache__/

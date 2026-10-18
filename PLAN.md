@@ -10,7 +10,11 @@ Build a read-only artifact client around an authenticated Playwright request con
 - [x] Accept explicitly supplied runtime credentials through bounded stdin JSON.
 - [x] Provide a Fetch adapter restricted to GET/HEAD and one origin, including redirects.
 - [x] Verify credential isolation, sanitized failures, and collector integration.
+- [x] Add optional browser-compatible HTTP transport for sessions rejected by ordinary HTTP stacks.
+- [x] Test private subprocess input, binary responses, failures, and cancellation.
 
 Authentication remains in the browser context or process memory. The caller owns credential capture; this package owns request restrictions and collection. Runtime headers flow through an injected Fetch adapter; manifests and ledgers contain no headers. Cross-origin redirects fail before another request is sent. Authentication failures return their HTTP status; transport failures expose no underlying error text. Recovery uses a fresh credential handoff and the existing verified resume ledger.
 
 The library performs GET/HEAD and writes only to staging. Existing evidence and downstream records are never modified. Done means the full test suite passes and service clients can use either authenticated transport without private configuration entering this repository.
+
+The optional browser-compatible transport runs a small Python worker using `curl_cffi`. The worker receives each request through stdin and returns one response through captured stdout. It follows no redirects and writes no credential or response files. The authenticated wrapper remains responsible for origin restrictions.

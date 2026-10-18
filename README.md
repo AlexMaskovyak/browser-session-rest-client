@@ -12,4 +12,6 @@ An injected transport performs GET/HEAD with the browser's authenticated request
 
 `createAuthenticatedFetch({ origin, headers })` accepts explicitly supplied runtime headers and returns a Fetch-compatible function. It permits GET/HEAD to that exact origin and follows only same-origin redirects. `createFetchTransport(fetch)` adapts it for the collector. `readCredentialsFromStdin()` reads bounded JSON containing `origin`, `headers`, and any caller-owned runtime configuration; it never writes or logs the input. Supply credentials through a private stdin pipe, never command arguments or a manifest.
 
+Some authenticated services reject ordinary HTTP stacks while accepting browser requests. `createBrowserCompatibleFetch()` provides an optional `curl_cffi` worker with a Chrome TLS and HTTP fingerprint. Inject it as `fetchImpl` into `createAuthenticatedFetch` to retain the same origin and redirect restrictions. It runs `uv run --with curl_cffi==0.16.3 python` by default; an existing environment can use `{ command: pythonExecutable, args: [] }`. Requests pass through stdin, responses through captured stdout, and no credential files are created. `uv` and Python are required only for this optional transport.
+
 See [the implementation plan](PLAN.md).
