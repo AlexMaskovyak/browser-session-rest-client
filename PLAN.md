@@ -7,5 +7,10 @@ Build a read-only artifact client around an authenticated Playwright request con
 - [x] Redact credentials and sensitive query values from all durable output.
 - [x] Expose a small adapter interface for service-specific clients.
 - [x] Test duplicate IDs, unsafe paths, auth failure, bad content, retries, and resume.
+- [x] Accept explicitly supplied runtime credentials through bounded stdin JSON.
+- [x] Provide a Fetch adapter restricted to GET/HEAD and one origin, including redirects.
+- [x] Verify credential isolation, sanitized failures, and collector integration.
 
-Authentication remains in the browser context. The library performs GET/HEAD and writes only to staging. Existing evidence and downstream records are never modified. Done means the test suite passes and `gusto-client` can consume the released interface without private configuration entering this repository.
+Authentication remains in the browser context or process memory. The caller owns credential capture; this package owns request restrictions and collection. Runtime headers flow through an injected Fetch adapter; manifests and ledgers contain no headers. Cross-origin redirects fail before another request is sent. Authentication failures return their HTTP status; transport failures expose no underlying error text. Recovery uses a fresh credential handoff and the existing verified resume ledger.
+
+The library performs GET/HEAD and writes only to staging. Existing evidence and downstream records are never modified. Done means the full test suite passes and service clients can use either authenticated transport without private configuration entering this repository.

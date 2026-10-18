@@ -53,7 +53,7 @@ async function requestWithRetry(artifact, transport, maxAttempts, sleep) {
       await sleep(Number.isFinite(retryAfter) ? Math.min(retryAfter * 1000, 30000) : 100 * (2 ** (attempt - 1)));
     } catch (error) {
       lastError = error;
-      if (attempt === maxAttempts) throw Object.assign(error, { attempts: attempt });
+      if (error.retryable === false || attempt === maxAttempts) throw Object.assign(error, { attempts: attempt });
       await sleep(100 * (2 ** (attempt - 1)));
     }
   }
