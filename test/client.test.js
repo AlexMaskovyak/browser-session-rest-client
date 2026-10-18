@@ -3,7 +3,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { collect, redactUrl, validateManifest } from '../src/index.js';
+import { collect, createPlaywrightFetch, redactUrl, validateManifest } from '../src/index.js';
 
 const artifact = { id: 'one', url: 'https://example.test/file?role_id=123', filename: 'one.pdf', expected: { contentType: 'application/pdf', magic: '%PDF-', minBytes: 6 } };
 
@@ -62,4 +62,22 @@ test('retries transient failures but not authentication failures', async () => {
   assert.equal(authCalls, 1);
   assert.equal(failed.results.auth.status, 'failed');
   assert.equal(failed.results.auth.attempts, 1);
+});
+
+test('adapts an authenticated Playwright request context to Fetch', async () => {
+  const calls = [];
+  const requestContext = { fetch: async (url, options) => {
+    calls.push({ url, options });
+    return {
+      ok: () => true,
+      status: () => 200,
+      url: () => url,
+      headers: () => ({ 'content-type': 'application/json' }),
+      body: async () => Buffer.from('{"ok":true}')
+    };
+  } };
+  const response = await createPlaywrightFetch(requestContext)(new URL('https://example.test/items'), { method: 'GET' });
+  assert.equal(response.ok, true);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.equal(calls[0].options.failOnStatusCode, false);
 });
