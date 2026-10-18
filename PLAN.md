@@ -1,5 +1,14 @@
 # Plan
 
+## Read-only query transport
+
+- [ ] Inspect the service's actual browser request before expanding beyond GET/HEAD.
+- [ ] If required for a GraphQL query, add an explicit, origin/path/body-scoped POST authorization hook; default behavior remains GET/HEAD only.
+- [ ] Carry the authorized body through the optional browser-compatible worker via stdin. Deny redirected POSTs and never persist or echo request bodies/headers.
+- [ ] Test default denial, allowlist scope, body validation, redirects, credential isolation, cancellation, and existing GET/HEAD compatibility before a live proof.
+
+Service-specific query semantics belong to the service client and caller-supplied request guard. This package owns authentication scope and transport. No mutation permission is implied by enabling a single query; failure must occur before sending an unapproved request.
+
 Build a read-only artifact client around an authenticated Playwright request context.
 
 - [x] Validate credential-free manifests and safe destination paths.
