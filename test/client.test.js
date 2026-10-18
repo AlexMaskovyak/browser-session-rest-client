@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { collect, createPlaywrightFetch, redactUrl, validateManifest } from '../src/index.js';
+import { collect, createPlaywrightFetch, redactUrl, requestContextFromStorageState, validateManifest } from '../src/index.js';
 
 const artifact = { id: 'one', url: 'https://example.test/file?role_id=123', filename: 'one.pdf', expected: { contentType: 'application/pdf', magic: '%PDF-', minBytes: 6 } };
 
@@ -80,4 +80,12 @@ test('adapts an authenticated Playwright request context to Fetch', async () => 
   assert.equal(response.ok, true);
   assert.deepEqual(await response.json(), { ok: true });
   assert.equal(calls[0].options.failOnStatusCode, false);
+});
+
+test('rejects a storage-state file with broad permissions', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'browser-session-client-'));
+  const storageState = path.join(root, 'state.json');
+  await writeFile(storageState, '{"cookies":[],"origins":[]}');
+  await chmod(storageState, 0o644);
+  await assert.rejects(requestContextFromStorageState(storageState), /must not be accessible/);
 });
