@@ -41,7 +41,26 @@ function verify(artifact, response) {
   return contentType;
 }
 
-export async function collect({ manifest, outputDir, ledgerPath, transport }) {
+const transientStatus = (status) => status === 408 || status === 429 || status >= 500;
+
+async function requestWithRetry(artifact, transport, maxAttempts, sleep) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await transport.request({ method: artifact.method ?? 'GET', url: artifact.url });
+      if (!transientStatus(response.status) || attempt === maxAttempts) return { response, attempts: attempt };
+      const retryAfter = Number(response.headers?.['retry-after']);
+      await sleep(Number.isFinite(retryAfter) ? Math.min(retryAfter * 1000, 30000) : 100 * (2 ** (attempt - 1)));
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) throw Object.assign(error, { attempts: attempt });
+      await sleep(100 * (2 ** (attempt - 1)));
+    }
+  }
+  throw lastError;
+}
+
+export async function collect({ manifest, outputDir, ledgerPath, transport, maxAttempts = 3, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
   validateManifest(manifest);
   await mkdir(outputDir, { recursive: true });
   await mkdir(path.dirname(ledgerPath), { recursive: true });
@@ -51,24 +70,27 @@ export async function collect({ manifest, outputDir, ledgerPath, transport }) {
     const target = path.join(outputDir, artifact.filename);
     if (await completedArtifact(target, ledger.results[artifact.id])) continue;
     const temporary = `${target}.part-${process.pid}`;
+    let attempts = 0;
     try {
-      const response = await transport.request({ method: artifact.method ?? 'GET', url: artifact.url });
+      const requested = await requestWithRetry(artifact, transport, maxAttempts, sleep);
+      const { response } = requested;
+      attempts = requested.attempts;
       const contentType = verify(artifact, response);
       await writeFile(temporary, response.body, { mode: 0o600 });
       await rename(temporary, target);
       const file = await stat(target);
       ledger.results[artifact.id] = {
         status: 'complete', filename: artifact.filename, url: redactUrl(response.url ?? artifact.url),
-        bytes: file.size, sha256: sha256(response.body), contentType
+        bytes: file.size, sha256: sha256(response.body), contentType, attempts
       };
     } catch (error) {
+      attempts = error.attempts ?? (attempts || 1);
       await unlink(temporary).catch(() => {});
       ledger.results[artifact.id] = {
-        status: 'failed', filename: artifact.filename, url: redactUrl(artifact.url), error: error.message
+        status: 'failed', filename: artifact.filename, url: redactUrl(artifact.url), error: error.message, attempts
       };
     }
     await writeJsonAtomic(ledgerPath, ledger);
   }
   return ledger;
 }
-
