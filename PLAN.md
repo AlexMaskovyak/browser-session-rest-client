@@ -6,6 +6,7 @@
 - [x] If required for a GraphQL query, add an explicit, origin/path/body-scoped POST authorization hook; default behavior remains GET/HEAD only.
 - [x] Carry the authorized body through the optional browser-compatible worker via stdin. Deny redirected POSTs and never persist or echo request bodies/headers.
 - [x] Test default denial, allowlist scope, body validation, redirects, credential isolation, cancellation, and existing GET/HEAD compatibility before a live proof.
+- [x] Verify an authenticated read-only query against a live service through both guarded Fetch factories.
 
 Service-specific query semantics belong to the service client and caller-supplied request guard. This package owns authentication scope and transport. No mutation permission is implied by enabling a single query; failure must occur before sending an unapproved request.
 
