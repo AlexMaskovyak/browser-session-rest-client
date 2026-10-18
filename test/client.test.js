@@ -3,9 +3,21 @@ import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { collect, createPlaywrightFetch, redactUrl, requestContextFromStorageState, validateManifest } from '../src/index.js';
 
 const artifact = { id: 'one', url: 'https://example.test/file?role_id=123', filename: 'one.pdf', expected: { contentType: 'application/pdf', magic: '%PDF-', minBytes: 6 } };
+
+test('direct transport imports do not load optional Playwright', async () => {
+  const loader = `export async function resolve(specifier, context, next) {
+    if (specifier === 'playwright-core') throw new Error('Playwright must not load');
+    return next(specifier, context);
+  }`;
+  const entry = new URL('../src/index.js', import.meta.url).href;
+  const script = `const api = await import(${JSON.stringify(entry)}); if (typeof api.createAuthenticatedFetch !== 'function') process.exit(2);`;
+  await promisify(execFile)(process.execPath, ['--no-warnings', '--experimental-loader', `data:text/javascript,${encodeURIComponent(loader)}`, '--input-type=module', '-e', script]);
+});
 
 test('rejects duplicate ids, unsafe paths, mutations, and secret fields', () => {
   assert.throws(() => validateManifest({ version: 1, artifacts: [artifact, artifact] }), /Duplicate/);
