@@ -16,4 +16,6 @@ Some authenticated services reject ordinary HTTP stacks while accepting browser 
 
 Direct HTTP transports require Node 18 or newer. The storage-state adapter loads Playwright only when selected; current Playwright releases require Node 20 or newer. Direct transports do not load Playwright.
 
+Install from the repository's Git URL. Install the optional `playwright-core` peer dependency only when using a Playwright adapter. The package is MIT licensed; npm registry publication is currently disabled.
+
 See [the implementation plan](PLAN.md).
