@@ -2,6 +2,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { realpathSync } from 'node:fs';
 import { generateWebsiteClient } from './generator.js';
 import { createAuthenticatedFetch, readCredentialsFromStdin } from './authenticated-fetch.js';
 import { createBrowserCompatibleFetch } from './browser-compatible-fetch.js';
@@ -37,4 +38,4 @@ export async function main(args = process.argv.slice(2)) {
   console.log(JSON.stringify({ generated: result.report.generatedOperations.length, rest: result.report.reviewedRestEndpoints.length + result.report.staticRestEndpoints.length, sources: result.report.sourceCount, bounded: result.report.bounded, failedSources: result.report.failed.length, liveVerified: false }));
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) main().catch(() => { console.error('Client generation failed. No endpoint operations were invoked; inspect any partial output before retrying.'); process.exitCode = 1; });
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(() => { console.error('Client generation failed. No endpoint operations were invoked; inspect any partial output before retrying.'); process.exitCode = 1; });

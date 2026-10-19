@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, symlink } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { main } from '../src/cli.js';
@@ -19,4 +21,10 @@ test('CLI generates a client and refuses to overwrite an existing directory', as
     assert.equal(await readFile(join(output,'index.js'),'utf8'),source);
     await assert.rejects(main(['--unknown']));
   } finally { globalThis.fetch=saved; }
+});
+test('CLI runs through an installed-style executable symlink', async () => {
+  const parent=await mkdtemp(join(tmpdir(),'website-cli-bin-'));
+  const executable=join(parent,'website-client');
+  await symlink(fileURLToPath(new URL('../src/cli.js',import.meta.url)),executable);
+  assert.match(execFileSync(executable,['--help'],{encoding:'utf8'}),/website-client --url HTTPS_URL/);
 });
