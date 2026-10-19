@@ -6,3 +6,4 @@ export { requestContextFromStorageState } from './storage-state.js';
 export { createAuthenticatedFetch, readCredentialsFromStdin } from './authenticated-fetch.js';
 export { createFetchTransport } from './fetch-transport.js';
 export { createBrowserCompatibleFetch } from './browser-compatible-fetch.js';
+export { discoverModuleReferences, discoverGraphqlDocuments, generateGraphqlOperationModule } from './discovery.js';

@@ -6,7 +6,11 @@
   "license": "MIT",
   "type": "module",
   "exports": "./src/index.js",
-  "files": ["src/", "README.md", "LICENSE"],
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test",
     "test:worker": "python3 -m unittest discover -s test -p '*_test.py'"
@@ -21,5 +25,8 @@
     "playwright-core": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "graphql": "16.11.0"
   }
 }
