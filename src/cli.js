@@ -7,6 +7,10 @@ import { createAuthenticatedFetch, readCredentialsFromStdin } from './authentica
 import { createBrowserCompatibleFetch } from './browser-compatible-fetch.js';
 
 export async function main(args = process.argv.slice(2)) {
+  if (args.length === 1 && args[0] === '--help') {
+    console.log('website-client --url HTTPS_URL --output NEW_DIRECTORY [--session-stdin] [--browser-compatible] [--graphql-endpoint HTTPS_URL] [--asset-origin HTTPS_ORIGIN] [--operation NAME] [--keyword TEXT] [--max-modules N]');
+    return;
+  }
   const options = {};
   for (let i = 0; i < args.length; i++) {
     if (['--session-stdin', '--browser-compatible'].includes(args[i])) options[args[i]] = true;

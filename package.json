@@ -10,7 +10,8 @@
     "website-client": "./src/cli.js"
   },
   "files": [
-    "src/",
+    "src/*.js",
+    "src/*.py",
     "docs/",
     "README.md",
     "LICENSE"
