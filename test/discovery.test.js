@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discoverModuleReferences, discoverGraphqlDocuments, generateGraphqlOperationModule } from '../src/discovery.js';
+import { discoverModuleReferences, discoverGraphqlDocuments, generateGraphqlOperationModule, discoverStaticFetchEndpoints } from '../src/discovery.js';
 
 test('discovers literal module candidates without executing source', () => {
   assert.deepEqual(discoverModuleReferences('import "./form.js"; ["assets/shared.js", "./form.js", `./${secret}.js`]; throw Error()', 'https://example.test/assets/app.js'), ['https://example.test/assets/form.js', 'https://example.test/assets/shared.js']);
@@ -20,4 +20,10 @@ test('rejects missing, conflicting and cyclic definitions and unsafe endpoints',
   const make = (documents, endpoint = 'https://example.test/graphql') => generateGraphqlOperationModule({ documents, endpoint, operationName: 'Read' });
   for (const docs of [['query Other { id }'], ['query Read { ...Missing }'], ['query Read { ...A } fragment A on Item { ...B } fragment B on Item { ...A }'], ['query Read { id }', 'query Read { name }']]) assert.throws(() => make(docs));
   assert.throws(() => make(['query Read { id }'], 'https://user:password@example.test/graphql'));
+});
+test('discovers static fetch methods without evaluating code or inventing computed contracts', () => {
+  assert.deepEqual(discoverStaticFetchEndpoints(`fetch('/api/items'); window.fetch('/api/items', {method:'POST', body: JSON.stringify({secret:'do-not-copy'})}); fetch(runtimeUrl); fetch('/api/unknown', dynamicOptions); fetch('/api/private?token=secret'); fetch('/api/unknown', {method: runtimeMethod});`, 'https://example.test/page'), [
+    {origin:'https://example.test',method:'POST',pathTemplate:'/api/items'},
+    {origin:'https://example.test',method:'GET',pathTemplate:'/api/items'}
+  ]);
 });

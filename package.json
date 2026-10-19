@@ -2,12 +2,16 @@
   "name": "browser-session-rest-client",
   "version": "0.1.0",
   "private": true,
-  "description": "Credential-safe artifact collection through authenticated browser request contexts",
+  "description": "Generate standalone API clients from website endpoints and reuse authorized browser sessions",
   "license": "MIT",
   "type": "module",
   "exports": "./src/index.js",
+  "bin": {
+    "website-client": "./src/cli.js"
+  },
   "files": [
     "src/",
+    "docs/",
     "README.md",
     "LICENSE"
   ],
@@ -27,6 +31,7 @@
     }
   },
   "dependencies": {
+    "acorn": "8.15.0",
     "graphql": "16.11.0"
   }
 }

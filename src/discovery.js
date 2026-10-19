@@ -1,4 +1,38 @@
 import { parse, print, visit } from 'graphql';
+import { parse as parseJavaScript } from 'acorn';
+
+/** Static fetch calls only; computed URLs/options require observed runtime evidence. */
+export function discoverStaticFetchEndpoints(source, websiteUrl) {
+  let ast;
+  try { ast = parseJavaScript(source, { ecmaVersion: 'latest', sourceType: 'module' }); }
+  catch { return []; }
+  const found = new Map();
+  const pending = [ast];
+  while (pending.length) {
+    const node = pending.pop();
+    if (!node || typeof node !== 'object') continue;
+    const callee = node.callee;
+    const isFetch = callee?.type === 'Identifier' && callee.name === 'fetch' ||
+      callee?.type === 'MemberExpression' && !callee.computed && ['window', 'globalThis'].includes(callee.object?.name) && callee.property?.name === 'fetch';
+    if (node.type === 'CallExpression' && isFetch && typeof node.arguments[0]?.value === 'string') {
+      const options = node.arguments[1];
+      const properties = options?.type === 'ObjectExpression' ? options.properties : [];
+      const methodField = properties.find((p) => (p.key?.name ?? p.key?.value) === 'method');
+      const method = methodField?.value?.value ?? 'GET';
+      if ((!options || options.type === 'ObjectExpression') && !properties.some((p) => p.type === 'SpreadElement') && (!methodField || typeof methodField.value?.value === 'string') && ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        try {
+          const url = new URL(node.arguments[0].value, websiteUrl);
+          if (url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash) found.set(`${method} ${url.href}`, { origin: url.origin, method, pathTemplate: url.pathname });
+        } catch { /* Unsupported URL literal. */ }
+      }
+    }
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) pending.push(...value);
+      else if (value && typeof value === 'object') pending.push(value);
+    }
+  }
+  return [...found.values()];
+}
 
 /** Passive candidate discovery. Never evaluates downloaded JavaScript. */
 export function discoverModuleReferences(source, sourceUrl) {
@@ -26,6 +60,7 @@ export function discoverGraphqlDocuments(source) {
 export function generateGraphqlOperationModule({ documents, operationName, endpoint }) {
   const url = new URL(endpoint);
   if (url.protocol !== 'https:' || url.username || url.password || url.hash) throw new Error('Invalid operation endpoint');
+  if ([...url.searchParams.keys()].some((key) => /token|key|secret|credential|signature|password|auth/i.test(key))) throw new Error('Credential-bearing operation endpoint is not allowed');
   const definitions = new Map();
   for (const document of documents) {
     for (const definition of parse(document).definitions) {
