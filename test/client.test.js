@@ -97,6 +97,7 @@ test('adapts an authenticated Playwright request context to Fetch', async () => 
   assert.equal(response.ok, true);
   assert.deepEqual(await response.json(), { ok: true });
   assert.equal(calls[0].options.failOnStatusCode, false);
+  assert.equal(calls[0].options.maxRedirects, 0);
 });
 
 test('rejects a storage-state file with broad permissions', async () => {

@@ -5,6 +5,7 @@ export function createPlaywrightFetch(requestContext) {
       method: init.method ?? 'GET',
       headers: init.headers,
       data: init.body,
+      maxRedirects: 0,
       failOnStatusCode: false
     });
     const body = await response.body();
@@ -20,4 +21,3 @@ export function createPlaywrightFetch(requestContext) {
     };
   };
 }
-

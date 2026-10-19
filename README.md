@@ -1,35 +1,52 @@
 # Browser Session REST Client
 
-Endpoint discovery, guarded requests, and verified artifact collection through an authenticated browser request context.
+Turn a website's discoverable API into a standalone JavaScript client, using an existing authorized browser session when needed.
 
-The project separates endpoint discovery, runtime authentication, service adapters, and verified artifact staging. Request manifests and result ledgers are credential-free. Authentication remains in the browser context or process memory; an explicitly supplied storage-state file is also supported.
+Give it a URL. It reads the page and its JavaScript modules, finds GraphQL operations and static REST calls, and generates callable methods. Generation never executes downloaded code or invokes discovered API operations.
 
-Service-specific behavior belongs in independent client repositories accepting an injected Fetch function. Real account identifiers, manifests, storage state, and downloaded artifacts do not belong here.
+## Generate a client
 
-## Design
+Install from this Git repository, then run:
 
-An injected transport performs GET/HEAD with the browser's authenticated request context. The collector validates a credential-free manifest, writes each response atomically, verifies content, hashes the result, and records a redacted resume ledger. Service behavior lives in separate packages.
+```sh
+website-client --url https://example.com/app --output ./example-client
+```
 
-`createAuthenticatedFetch({ origin, headers })` accepts explicitly supplied runtime headers and returns a Fetch-compatible function. It permits GET/HEAD to that exact origin and follows only same-origin redirects. `createFetchTransport(fetch)` adapts it for the collector. `readCredentialsFromStdin()` reads bounded JSON containing `origin`, `headers`, and any caller-owned runtime configuration; it never writes or logs the input. Supply credentials through a private stdin pipe, never command arguments or a manifest.
+For a logged-in website, the browser integration supplies the current URL and temporary session through stdin:
 
-For a known read-only API query that requires POST, both Fetch factories accept `authorizePost({ url, body })`. The caller's synchronous predicate must verify the exact endpoint and query body and return `true`. POST requires an explicit string body of at most 1 MiB; Request body streams and all POST redirects are rejected. Pass the guard to both factories when composing them. Other methods remain disabled, and artifact manifests remain GET/HEAD only.
+```sh
+session-provider | website-client --url https://example.com/app \
+  --output ./example-client --session-stdin
+```
 
-Some authenticated services reject ordinary HTTP stacks while accepting browser requests. `createBrowserCompatibleFetch()` provides an optional `curl_cffi` worker with a Chrome TLS and HTTP fingerprint. Inject it as `fetchImpl` into `createAuthenticatedFetch` to retain the same origin and redirect restrictions. It runs `uv run --with curl_cffi==0.16.3 python` by default; an existing environment can use `{ command: pythonExecutable, args: [] }`. Requests pass through stdin, responses through captured stdout, and no credential files are created. `uv` and Python are required only for this optional transport.
+`session-provider` represents your browser integration, not a bundled login command. The companion agent skill handles this handoff. The CLI does not attach to arbitrary Chrome tabs or extract cookies itself. Credentials never belong in command arguments or generated files.
 
-Direct HTTP transports require Node 18 or newer. The storage-state adapter loads Playwright only when selected; current Playwright releases require Node 20 or newer. Direct transports do not load Playwright.
+The stdin object contains `{ origin, headers }`. Optional fields: `assetOrigins` (approved CDNs), `apiOrigins` (approved REST origins), `moduleUrls` (observed modules), `graphqlEndpoint` (observed endpoint URL or operation-name-to-URL map), and `restEndpoints` (reviewed `{ name, origin, method, pathTemplate }` contracts). No runtime headers, variables or receipt contents enter generated source.
 
-Install from the repository's Git URL. Install the optional `playwright-core` peer dependency only when using a Playwright adapter. The package is MIT licensed; npm registry publication is currently disabled.
+Flags: `--graphql-endpoint`; repeatable `--asset-origin`, `--operation`, `--keyword`; `--max-modules` (default 80); `--browser-compatible` for the optional Chrome-fingerprint transport. Assets receive no application credentials. Existing output directories are never overwritten.
 
-Run `npm test` for the JavaScript suite and `npm run test:worker` for the Python worker tests.
+## Use the generated client
 
-## Extending a service client
+```js
+import { WebsiteClient } from './example-client/index.js';
+const client = new WebsiteClient({ fetch: authenticatedFetch });
+const result = await client.ListItems({ first: 20 }); // Discovered operation name
+```
 
-Use the injected authenticated transport to fetch the application's HTML and discovered module URLs. `discoverModuleReferences(source, sourceUrl)` finds same-origin literal JavaScript candidates (including Vite dependency tables). `discoverGraphqlDocuments(source)` extracts GraphQL source literals. Neither evaluates downloaded code. Discovery is deliberately passive and does not prove that an endpoint is authorized or live-compatible.
+Output: `index.js`, operation definitions, `package.json`, and `discovery.json`. The generated client has no dependency on this package. GraphQL methods accept variables; REST methods accept `{ path, query, body }`. Writes require both `allowMutations: true` at construction and `{ confirmMutation: true }` per call. No automatic write retries.
 
-`generateGraphqlOperationModule({ documents, operationName, endpoint })` selects one named query/mutation and its transitive fragments and returns a standalone JavaScript descriptor. Apply that generated source in the service repository; it has no runtime dependency on this package. Review definitions and input construction before use. Never feed account HTML, runtime variables, headers, or captured authenticated requests into generated source.
+For integrations, `generateWebsiteClient({ url, fetch, assetFetch, ...options })` returns `{ files, report }` without writing to disk. Use it to extend an existing service repository, not replace hand-maintained domain logic. `generateGraphqlOperationModule()` generates just one operation and its fragments.
 
-For separately authorized mutations, both Fetch factories accept `authorizeWrite({ url, method, body, headers })`. It must synchronously approve the exact request. Only POST/PUT with explicit strings or Uint8Array bodies up to 16 MiB are accepted. Binary bodies are copied before authorization. Supply the same predicate at both transport layers. A write predicate takes precedence over `authorizePost`; combine approved read operations explicitly if needed. GET/HEAD defaults and GET-only artifact manifests are unchanged. Writes are never redirected or retried by these factories.
+## Discovery limits
 
-Use a separate credential-free, origin-scoped transport for signed storage uploads. Restrict it to the exact URL, bytes, and required headers, and never send application cookies to storage. Do not persist signed URLs or tokens. An interrupted write may have succeeded; reconcile service state before retrying. A receipt upload is not an expense submission.
+- GraphQL source definitions produce named methods with required-variable checks. Supply an observed GraphQL endpoint; API routes are not guessed.
+- Literal `fetch()` calls produce REST scaffolds. Computed URLs, runtime-only calls, custom wrappers and payload semantics require browser evidence and reviewed contracts.
+- `discovery.json` reports sources, failures, remaining modules and bounds. A bounded scan is not complete website coverage. Generated methods are not live-verified until tested through an authorized session.
 
-See [the implementation plan](PLAN.md).
+The workflow is discovery → generation → service-specific validation → authorized live verification. Generating a client does not authorize its mutations.
+
+## Transport and downloads
+
+Also included: origin-scoped authenticated Fetch, explicitly guarded JSON/binary writes, and atomic hash-verified artifact downloads. Authentication stays in the browser context or process memory. Service-specific rules belong in independent clients.
+
+See [transport and collection](docs/transports.md). Node 18+; Playwright is optional. MIT licensed; npm registry publication is disabled. Tests: `npm test` and `npm run test:worker`.

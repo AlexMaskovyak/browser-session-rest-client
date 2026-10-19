@@ -33,8 +33,19 @@ The artifact collector performs GET/HEAD and writes only to staging. Fetch adapt
 The optional browser-compatible transport runs a small Python worker using `curl_cffi`. The worker receives each request through stdin and returns one response through captured stdout. It follows no redirects and writes no credential or response files. The authenticated wrapper remains responsible for origin restrictions.
 # Endpoint discovery and guarded writes
 
-- [ ] Add passive frontend-module and GraphQL-document discovery; generate standalone operation descriptors without executing fetched code.
-- [ ] Add explicit, bounded POST/PUT authorization for JSON and binary writes, retaining read-only defaults and rejecting write redirects.
-- [ ] Test discovery, generated output, byte limits, body immutability, origin isolation, worker behavior, and redaction; document limits and commit changes.
+- [x] Add passive frontend-module and GraphQL-document discovery; generate standalone operation descriptors without executing fetched code.
+- [x] Add explicit, bounded POST/PUT authorization for JSON and binary writes, retaining read-only defaults and rejecting write redirects.
+- [x] Test discovery, generated output, byte limits, body immutability, origin isolation, worker behavior, and redaction; document limits and commit changes.
 
 The caller supplies already-discovered source URLs and approved request contracts. Source analysis discovers candidates, not proof of live compatibility. Generated descriptors contain only endpoint/query definitions, never request variables or credentials. Service clients own domain validation. Each write requires a synchronous exact-request predicate; storage uploads use a separate credential-free origin-scoped transport. No implicit retries or cross-origin redirects are allowed for writes. Ambiguous write outcomes require service-side reconciliation before retrying.
+
+## Website-to-client entrypoint
+
+- [x] Provide one bounded discovery/generation API and command: website URL plus optional in-memory session, endpoint hints, and operation selection -> standalone client files and a coverage report.
+- [x] Reuse authenticated Fetch for the website and credential-free Fetch for approved asset origins. Traverse discovered module references without executing source. Generate named GraphQL methods and reviewed REST methods; refuse missing or ambiguous endpoint mappings.
+- [x] Test the complete website-to-generated-client flow with synthetic websites, including writes disabled by default, private input exclusion, partial coverage, and existing-output protection. Run the entrypoint against the live inspected application without invoking mutations.
+- [x] Rewrite the README around that workflow and update the installed skill to invoke it rather than manually recreate discovery.
+
+Verification: 42 JavaScript tests and 5 Python worker tests pass. The CLI generated a selected operation from an authenticated application's inspected module, with bounded coverage explicitly reported; its descriptor matched the separately inspected source. No generated mutation was executed. Browser attachment remains the integration/skill's responsibility; computed runtime-only contracts still require observed request evidence.
+
+The generator owns passive source discovery and reusable client scaffolding, not universal API inference. Browser automation supplies the current URL/session and observed endpoint mapping when the website does not expose it. The generated client owns no authentication or bookkeeping data. Generation does not execute discovered operations. Coverage must expose unreadable modules, bounds and unsupported runtime-only contracts; never claim the entire website is understood. Output is created exclusively in a new directory; interrupted generation is recoverable by inspecting that directory, never overwriting an existing client.
