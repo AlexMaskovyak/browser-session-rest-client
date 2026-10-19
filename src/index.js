@@ -8,3 +8,4 @@ export { createFetchTransport } from './fetch-transport.js';
 export { createBrowserCompatibleFetch } from './browser-compatible-fetch.js';
 export { discoverModuleReferences, discoverGraphqlDocuments, generateGraphqlOperationModule, discoverStaticFetchEndpoints } from './discovery.js';
 export { generateWebsiteClient } from './generator.js';
+export { generateWithBrowserLogin } from './browser-login.js';

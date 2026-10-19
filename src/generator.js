@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { parse } from 'graphql';
+import { parse, print } from 'graphql';
 import { discoverModuleReferences, discoverGraphqlDocuments, generateGraphqlOperationModule, discoverStaticFetchEndpoints } from './discovery.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
@@ -12,7 +12,7 @@ function safeUrl(value) {
 /** Discover from source, not by probing candidate API routes or executing JavaScript. */
 export async function generateWebsiteClient({
   url, fetch: sessionFetch, assetFetch = globalThis.fetch, assetOrigins = [], graphqlEndpoint,
-  operationNames, moduleUrls = [], restEndpoints = [], apiOrigins = [], name = 'website-client', maxModules = 80,
+  operationNames, moduleUrls = [], graphqlDocuments = [], restEndpoints = [], apiOrigins = [], name = 'website-client', maxModules = 80,
   maxSourceBytes = 4 * 1024 * 1024, maxTotalBytes = 32 * 1024 * 1024, keywords = []
 } = {}) {
   const website = safeUrl(url);
@@ -83,6 +83,15 @@ export async function generateWebsiteClient({
       for (const reference of discoverModuleReferences(source, target)) enqueue(reference, target);
     } catch { failed.push({ path: new URL(target).pathname, reason: 'unavailable-or-over-limit' }); }
   }
+  // Prefer source definitions over runtime documents (which often add __typename).
+  const sourceNames = new Set(documents.flatMap((document) => parse(document).definitions.map((definition) => definition.name?.value)));
+  let runtimeBytes = 0;
+  for (const document of graphqlDocuments) {
+    runtimeBytes += Buffer.byteLength(document);
+    if (runtimeBytes > maxTotalBytes) throw new Error('Observed definitions exceed discovery limit');
+    const definitions = parse(document).definitions.filter((definition) => definition.name && !sourceNames.has(definition.name.value));
+    if (definitions.length) documents.push(print({ kind: 'Document', definitions }));
+  }
   const available = new Set();
   for (const document of documents) for (const definition of parse(document).definitions) {
     if (definition.kind === 'OperationDefinition' && definition.name && ['query', 'mutation'].includes(definition.operation)) available.add(definition.name.value);
@@ -95,7 +104,7 @@ export async function generateWebsiteClient({
   for (const operationName of names) {
     if (['__proto__', 'prototype', 'constructor', 'request', 'fetch', 'allowMutations'].includes(operationName)) throw new Error('Operation name conflicts with generated API');
     // An endpoint is an observed mapping supplied by the session, never inferred from an operation name.
-    const endpoint = typeof graphqlEndpoint === 'string' ? graphqlEndpoint : graphqlEndpoint[operationName];
+    const endpoint = typeof graphqlEndpoint === 'function' ? graphqlEndpoint(operationName) : typeof graphqlEndpoint === 'string' ? graphqlEndpoint : graphqlEndpoint[operationName];
     if (!endpoint) throw new Error('Missing operation endpoint mapping');
     const generated = generateGraphqlOperationModule({ documents, operationName, endpoint });
     const descriptor = JSON.parse(generated.slice(generated.indexOf('Object.freeze(') + 14, generated.lastIndexOf(');')));

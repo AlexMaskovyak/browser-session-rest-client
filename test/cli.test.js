@@ -17,7 +17,7 @@ test('CLI generates a client and refuses to overwrite an existing directory', as
     await main(args);
     const source=await readFile(join(output,'index.js'),'utf8');
     assert.match(source,/WebsiteClient/);
-    await assert.rejects(main(args),{code:'EEXIST'});
+    await assert.rejects(main(args),{code:'CLI_USAGE'});
     assert.equal(await readFile(join(output,'index.js'),'utf8'),source);
     await assert.rejects(main(['--unknown']));
   } finally { globalThis.fetch=saved; }
