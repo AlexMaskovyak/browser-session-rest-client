@@ -1,5 +1,14 @@
 # Plan
 
+## CLI browser login and generation
+
+- [ ] Add `--login`: launch an isolated browser, let the user authenticate and browse, then continue on terminal confirmation. Supply Playwright automatically; use installed Chrome by default.
+- [ ] Observe modules and named GraphQL contracts, bind observed endpoints, and invoke the existing generator through the same browser session. Do not require copied headers or a session-provider command.
+- [ ] Test login-to-generation, cookie continuity, secret exclusion, cancellation, missing browser, ambiguous discovery, cleanup and existing-output protection. Run an actual browser against a synthetic authenticated site.
+- [ ] Document the executable command, update the installed skill, run full suites and commit/push targeted steps.
+
+The CLI owns browser lifecycle and terminal handoff; the human owns login/MFA and navigation. Playwright's isolated temporary context owns authentication; no storage-state, HAR, trace, screenshots or credential exports are written. Browser-managed temporary profile files are removed on normal close. The observer retains only bounded endpoint/query definitions and module references, never login bodies, variables or headers. Asset fetching uses a separate credential-free context. Generation does not execute API operations. Failure/cancellation closes owned contexts and leaves existing clients untouched; retry starts a fresh login. Observed shared GraphQL endpoints may bind unexecuted source definitions, but that is not live mutation verification.
+
 ## Read-only query transport
 
 - [x] Inspect the service's actual browser request before expanding beyond GET/HEAD.
