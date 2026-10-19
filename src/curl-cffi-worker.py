@@ -11,20 +11,25 @@ def main():
     configuration = json.load(sys.stdin)
     method = configuration["method"]
     body = configuration.get("body")
-    if method == "POST":
+    if method in {"POST", "PUT"} and configuration.get("authorizedWrite") is True:
+        body = base64.b64decode(configuration["bodyBase64"], validate=True)
+        if len(body) > 16 * 1024 * 1024:
+            raise ValueError("Write body exceeds size limit")
+    elif method == "POST":
         if (
             configuration.get("authorizedPost") is not True
             or not isinstance(body, str)
             or len(body.encode("utf-8")) > 1024 * 1024
         ):
             raise ValueError("POST request is not authorized")
+        body = body.encode("utf-8")
     elif method not in {"GET", "HEAD"} or body is not None:
         raise ValueError("Unsupported method")
     response = requests.request(
         method,
         configuration["url"],
         headers=configuration["headers"],
-        **({"data": body.encode("utf-8")} if method == "POST" else {}),
+        **({"data": body} if method in {"POST", "PUT"} else {}),
         timeout=configuration["timeout"],
         impersonate="chrome",
         default_headers=False,

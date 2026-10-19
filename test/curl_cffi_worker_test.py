@@ -1,4 +1,5 @@
 import importlib.util
+import base64
 import io
 import json
 from pathlib import Path
@@ -56,6 +57,20 @@ class WorkerPostTests(unittest.TestCase):
             request = Mock()
             with self.assertRaises(ValueError):
                 self.run_worker(self.configuration(authorizedPost=True, body=body), request)
+            request.assert_not_called()
+
+    def test_authorized_binary_write_preserves_bytes(self):
+        request = Mock()
+        body = b"\x00\xff\x80receipt"
+        self.run_worker(self.configuration(method="PUT", authorizedWrite=True, bodyBase64=base64.b64encode(body).decode()), request)
+        self.assertEqual(request.call_args.kwargs["data"], body)
+        self.assertIs(request.call_args.kwargs["allow_redirects"], False)
+
+    def test_binary_writes_reject_missing_authorization_and_invalid_base64(self):
+        for changes in ({"bodyBase64": "AA=="}, {"authorizedWrite": True, "bodyBase64": "!invalid"}):
+            request = Mock()
+            with self.assertRaises(ValueError):
+                self.run_worker(self.configuration(method="PUT", **changes), request)
             request.assert_not_called()
 
 

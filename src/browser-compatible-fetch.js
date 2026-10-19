@@ -7,15 +7,17 @@ const workerPath = fileURLToPath(new URL('./curl-cffi-worker.py', import.meta.ur
 /** Optional HTTP transport retaining browser-compatible TLS and HTTP fingerprints. */
 export function createBrowserCompatibleFetch({
   command = 'uv', args = ['run', '--with', 'curl_cffi==0.16.3', 'python'],
-  timeoutMs = 60000, maxResponseBytes = 64 * 1024 * 1024, authorizePost
+  timeoutMs = 60000, maxResponseBytes = 64 * 1024 * 1024, authorizePost, authorizeWrite
 } = {}) {
   return async function browserCompatibleFetch(input, init = {}) {
     const url = requestUrl(input);
-    const { method, body } = authorizeRequest(input, init, url, authorizePost);
+    const { method, body } = authorizeRequest(input, init, url, authorizePost, authorizeWrite);
     if (init.signal?.aborted) throw new Error('Browser-compatible request was aborted');
     const request = {
       url: url.toString(), method, headers: Object.fromEntries(new Headers(init.headers)),
-      ...(method === 'POST' ? { body, authorizedPost: true } : {}),
+      ...(!['GET', 'HEAD'].includes(method) ? (authorizeWrite ? {
+        bodyBase64: Buffer.from(body).toString('base64'), authorizedWrite: true
+      } : { body, authorizedPost: true }) : {}),
       timeout: Math.max(1, Math.floor(timeoutMs / 1000))
     };
     const result = await new Promise((resolve, reject) => {
@@ -47,8 +49,8 @@ export function createBrowserCompatibleFetch({
       });
       child.stdin.end(JSON.stringify(request));
     });
-    if (method === 'POST' && result.status >= 300 && result.status < 400) {
-      throw requestFailure('POST redirects are not allowed');
+    if (!['GET', 'HEAD'].includes(method) && result.status >= 300 && result.status < 400) {
+      throw requestFailure(`${method} redirects are not allowed`);
     }
     try {
       const responseBody = method === 'HEAD' || [204, 205, 304].includes(result.status) ? null : Buffer.from(result.body, 'base64');

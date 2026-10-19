@@ -20,7 +20,7 @@ function validatedHeaders(value) {
 }
 
 /** Credentials are supplied by the caller and retained only in this closure. */
-export function createAuthenticatedFetch({ origin, headers, fetchImpl = globalThis.fetch, maxRedirects = 5, authorizePost }) {
+export function createAuthenticatedFetch({ origin, headers, fetchImpl = globalThis.fetch, maxRedirects = 5, authorizePost, authorizeWrite }) {
   const allowedOrigin = validatedOrigin(origin);
   const authentication = validatedHeaders(headers);
   if (typeof fetchImpl !== 'function') throw failure('A Fetch implementation is required');
@@ -29,7 +29,7 @@ export function createAuthenticatedFetch({ origin, headers, fetchImpl = globalTh
   return async function authenticatedFetch(input, init = {}) {
     let url = requestUrl(input);
     if (url.origin !== allowedOrigin) throw failure('Request origin is not allowed');
-    const { method, body } = authorizeRequest(input, init, url, authorizePost);
+    const { method, body } = authorizeRequest(input, init, url, authorizePost, authorizeWrite);
     let requestHeaders;
     try { requestHeaders = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined)); }
     catch { throw failure('Invalid request headers'); }
@@ -41,13 +41,13 @@ export function createAuthenticatedFetch({ origin, headers, fetchImpl = globalTh
       try {
         response = await fetchImpl(url.toString(), {
           method, headers: requestHeaders, redirect: 'manual',
-          ...(method === 'POST' ? { body } : {}),
+          ...(!['GET', 'HEAD'].includes(method) ? { body } : {}),
           signal: init.signal ?? (input instanceof Request ? input.signal : undefined)
         });
       } catch { throw new Error('Authenticated request failed'); }
-      if (method === 'POST' && response.status >= 300 && response.status < 400) {
+      if (!['GET', 'HEAD'].includes(method) && response.status >= 300 && response.status < 400) {
         await response.body?.cancel().catch(() => {});
-        throw failure('POST redirects are not allowed');
+        throw failure(`${method} redirects are not allowed`);
       }
       if (!redirects.has(response.status)) return response;
       const location = response.headers.get('location');

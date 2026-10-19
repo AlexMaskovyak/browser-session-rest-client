@@ -12,13 +12,30 @@ export function requestUrl(input) {
   return url;
 }
 
-export function authorizeRequest(input, init, url, authorizePost) {
+export function authorizeRequest(input, init, url, authorizePost, authorizeWrite) {
   const method = String(init.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
   if (method === 'GET' || method === 'HEAD') {
     if (init.body != null || (input instanceof Request && input.body !== null)) {
       throw requestFailure('Read-only requests must not contain a body');
     }
     return { method };
+  }
+  if (typeof authorizeWrite === 'function' && ['POST', 'PUT'].includes(method)) {
+    if ((input instanceof Request && input.body !== null) ||
+        !(typeof init.body === 'string' || init.body instanceof Uint8Array)) {
+      throw requestFailure('Writes require an explicit string or Uint8Array body');
+    }
+    const body = typeof init.body === 'string' ? init.body : new Uint8Array(init.body);
+    const size = typeof body === 'string' ? Buffer.byteLength(body, 'utf8') : body.byteLength;
+    if (size > 16 * 1024 * 1024) throw requestFailure('Write body exceeds 16 MiB');
+    let authorized;
+    try { authorized = authorizeWrite({ url: url.href, method, body: typeof body === 'string' ? body : new Uint8Array(body), headers: new Headers(init.headers) }); }
+    catch { throw requestFailure('Write authorization failed'); }
+    if (authorized !== true) {
+      Promise.resolve(authorized).catch(() => {});
+      throw requestFailure('Write request is not authorized');
+    }
+    return { method, body };
   }
   if (method !== 'POST' || typeof authorizePost !== 'function') {
     throw requestFailure('Only GET and HEAD requests are supported without explicit POST authorization');
