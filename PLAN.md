@@ -31,3 +31,10 @@ Authentication remains in the browser context or process memory. The caller owns
 The artifact collector performs GET/HEAD and writes only to staging. Fetch adapters also support caller-authorized read-only POST queries. Existing evidence and downstream records are never modified. Done means the full test suite passes and service clients can use either authenticated transport without private configuration entering this repository.
 
 The optional browser-compatible transport runs a small Python worker using `curl_cffi`. The worker receives each request through stdin and returns one response through captured stdout. It follows no redirects and writes no credential or response files. The authenticated wrapper remains responsible for origin restrictions.
+# Endpoint discovery and guarded writes
+
+- [ ] Add passive frontend-module and GraphQL-document discovery; generate standalone operation descriptors without executing fetched code.
+- [ ] Add explicit, bounded POST/PUT authorization for JSON and binary writes, retaining read-only defaults and rejecting write redirects.
+- [ ] Test discovery, generated output, byte limits, body immutability, origin isolation, worker behavior, and redaction; document limits and commit changes.
+
+The caller supplies already-discovered source URLs and approved request contracts. Source analysis discovers candidates, not proof of live compatibility. Generated descriptors contain only endpoint/query definitions, never request variables or credentials. Service clients own domain validation. Each write requires a synchronous exact-request predicate; storage uploads use a separate credential-free origin-scoped transport. No implicit retries or cross-origin redirects are allowed for writes. Ambiguous write outcomes require service-side reconciliation before retrying.
