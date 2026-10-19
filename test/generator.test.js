@@ -93,3 +93,10 @@ test('explicit browser-observed modules are visited ahead of general page preloa
   assert.equal(result.report.sourceCount,1);
   assert.equal(result.report.bounded,true);
 });
+test('browser endpoint ambiguity leaves explicit coverage gaps rather than guessing or discarding mapped operations', async () => {
+  const graphqlEndpoint=name=>name==='List'?endpoint:undefined;
+  const result=await generateWebsiteClient({...options,graphqlEndpoint});
+  assert.deepEqual(result.report.generatedOperations,['List']);
+  assert.deepEqual(result.report.unboundOperations,['Create']);
+  await assert.rejects(generateWebsiteClient({...options,graphqlEndpoint,operationNames:['Create']}),/Missing operation endpoint/);
+});

@@ -101,16 +101,20 @@ export async function generateWebsiteClient({
   if (names.length && !graphqlEndpoint) throw new Error('Observed GraphQL endpoint required; API routes are not guessed');
   const files = {};
   const operations = {};
+  const generatedNames = [];
+  const unboundOperations = [];
   for (const operationName of names) {
     if (['__proto__', 'prototype', 'constructor', 'request', 'fetch', 'allowMutations'].includes(operationName)) throw new Error('Operation name conflicts with generated API');
     // An endpoint is an observed mapping supplied by the session, never inferred from an operation name.
     const endpoint = typeof graphqlEndpoint === 'function' ? graphqlEndpoint(operationName) : typeof graphqlEndpoint === 'string' ? graphqlEndpoint : graphqlEndpoint[operationName];
+    if (!endpoint && typeof graphqlEndpoint === 'function' && operationNames === undefined) { unboundOperations.push(operationName); continue; }
     if (!endpoint) throw new Error('Missing operation endpoint mapping');
     const generated = generateGraphqlOperationModule({ documents, operationName, endpoint });
     const descriptor = JSON.parse(generated.slice(generated.indexOf('Object.freeze(') + 14, generated.lastIndexOf(');')));
     const definition = parse(descriptor.query).definitions.find((d) => d.kind === 'OperationDefinition');
     descriptor.variables = definition.variableDefinitions.map((d) => ({ name: d.variable.name.value, required: d.type.kind === 'NonNullType' && !d.defaultValue }));
     operations[operationName] = descriptor;
+    generatedNames.push(operationName);
     files[`operations/${operationName}.js`] = generated;
   }
   const rest = {};
@@ -121,11 +125,11 @@ export async function generateWebsiteClient({
     if (new URL(endpoint.pathTemplate.replaceAll(/\{[A-Za-z][A-Za-z0-9_]*\}/g, 'placeholder'), origin).origin !== origin) throw new Error('Invalid reviewed REST path');
     rest[endpoint.name] = { origin, method: endpoint.method, pathTemplate: endpoint.pathTemplate };
   }
-  if (!names.length && !Object.keys(rest).length) throw new Error('No supported endpoint contracts discovered; inspect runtime requests or provide reviewed REST contracts');
+  if (!generatedNames.length && !Object.keys(rest).length) throw new Error('No supported endpoint contracts discovered; inspect runtime requests or provide reviewed REST contracts');
   files['operations.js'] = `export const operations = ${JSON.stringify(operations, null, 2)};\nexport const restEndpoints = ${JSON.stringify(rest, null, 2)};\n`;
   files['index.js'] = GENERATED_CLIENT;
   files['package.json'] = `${JSON.stringify({ name, version: '0.1.0', private: true, type: 'module', exports: './index.js', engines: { node: '>=18' } }, null, 2)}\n`;
-  const report = { websiteOrigin: website.origin, sourceCount: sources.length, sourceBytes: bytes, sources, failed, remainingModules: pending.size, bounded: pending.size > 0, discoveredOperations: [...available], generatedOperations: names, staticRestEndpoints: staticEndpoints.map((e) => e.name), reviewedRestEndpoints: restEndpoints.map((e) => e.name), liveVerified: false, limitations: ['Passive source inspection only; runtime-only and undiscovered routes may be missing.', 'Static REST methods are scaffolds; runtime payload validation and parameterization require review.', 'Generation never executes endpoint operations. Live compatibility requires an authorized read or separately approved write.'] };
+  const report = { websiteOrigin: website.origin, sourceCount: sources.length, sourceBytes: bytes, sources, failed, remainingModules: pending.size, bounded: pending.size > 0, discoveredOperations: [...available], generatedOperations: generatedNames, unboundOperations, staticRestEndpoints: staticEndpoints.map((e) => e.name), reviewedRestEndpoints: restEndpoints.map((e) => e.name), liveVerified: false, limitations: ['Passive source inspection only; runtime-only and undiscovered routes may be missing.', 'Static REST methods are scaffolds; runtime payload validation and parameterization require review.', 'Generation never executes endpoint operations. Live compatibility requires an authorized read or separately approved write.'] };
   files['discovery.json'] = `${JSON.stringify(report, null, 2)}\n`;
   files['README.md'] = `# ${name}\n\nGenerated from inspected website contracts. See discovery.json for coverage and verification limits.\n\nInject an authorized Fetch transport into WebsiteClient. Call named methods with GraphQL variables, or REST input { path, query, body }. Writes require allowMutations: true and per-call { confirmMutation: true }. No automatic retries. Authentication remains caller-owned. Inspect and test domain validation before production use.\n`;
   return { files, report };
