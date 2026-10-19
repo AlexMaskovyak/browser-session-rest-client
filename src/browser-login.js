@@ -82,7 +82,7 @@ async function launchBrowser(channel) {
   try {
     const { chromium } = await import('playwright-core');
     return await chromium.launch({ channel, headless: false });
-  } catch { throw new Error('Could not open the login browser. Install Chrome, or use --browser chromium after running npx playwright-core install chromium.'); }
+  } catch { throw new Error('Could not open the login browser. Install Chrome, or use --browser chromium after running npx playwright-core@1.56.0 install chromium.'); }
 }
 
 async function confirmLogin({ signal }) {
@@ -153,7 +153,7 @@ export async function generateWithBrowserLogin(options, {
     const safe = ['Could not open the login browser.', '--login requires', 'Supported login browsers:', 'Login is not complete.', 'Login browser closed', 'Client generation cancelled', 'Browser login requires', 'No supported endpoint', 'Selected operation was not discovered', 'Missing operation endpoint mapping'];
     const prefix = safe.find((prefix) => error?.message?.startsWith(prefix));
     const message = prefix ? {
-      'Could not open the login browser.': 'Could not open the login browser. Install Chrome, or run npx playwright-core install chromium and use --browser chromium.',
+      'Could not open the login browser.': 'Could not open the login browser. Install Chrome, or run npx playwright-core@1.56.0 install chromium and use --browser chromium.',
       '--login requires': '--login requires an interactive terminal, not a pipe.',
       'Supported login browsers:': 'Supported login browsers: chrome, chromium, msedge.',
       'Login is not complete.': 'Login is not complete. Return to the requested website before pressing Enter.',

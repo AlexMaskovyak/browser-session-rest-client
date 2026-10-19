@@ -56,7 +56,7 @@ export async function main(args = process.argv.slice(2), browserDependencies = {
     if (relative.includes('/')) await mkdir(join(output, 'operations'), { recursive: true });
     await writeFile(join(output, relative), source, { flag: 'wx' });
   }
-  console.log(JSON.stringify({ generated: result.report.generatedOperations.length, rest: result.report.reviewedRestEndpoints.length + result.report.staticRestEndpoints.length, sources: result.report.sourceCount, bounded: result.report.bounded, failedSources: result.report.failed.length, liveVerified: false }));
+  console.log(JSON.stringify({ generated: result.report.generatedOperations.length, rest: result.report.reviewedRestEndpoints.length + result.report.staticRestEndpoints.length, unbound: result.report.unboundOperations?.length ?? 0, sources: result.report.sourceCount, bounded: result.report.bounded, failedSources: result.report.failed.length, liveVerified: false }));
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((error) => { console.error(['CLI_USAGE', 'BROWSER_LOGIN'].includes(error.code) ? error.message : 'Client generation failed. No endpoint operations were invoked; inspect any partial output before retrying.'); process.exitCode = 1; });

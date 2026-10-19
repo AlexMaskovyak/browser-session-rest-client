@@ -2,7 +2,15 @@
 
 `createAuthenticatedFetch({ origin, headers, fetchImpl })` permits GET/HEAD to one exact origin and follows only same-origin read redirects. Credentials remain in the closure. `readCredentialsFromStdin()` accepts bounded runtime JSON without persisting or logging it. `createFetchTransport(fetch)` adapts Fetch for the atomic collector, which validates manifests, content and hashes and maintains a redacted resume ledger.
 
-`createPlaywrightFetch(context.request)` uses an authorized browser request context. Install `playwright-core` only for a Playwright adapter; direct transports do not need it. Browser attachment and login belong to the integration.
+`createPlaywrightFetch(context.request)` uses an authorized browser request context. The bundled Playwright library is loaded only for browser features. `generateWithBrowserLogin(options)` owns an isolated browser, human login/MFA handoff, observed contract capture, generation and cleanup; it backs the CLI's `--login` path. It does not attach to or alter an existing Chrome profile.
+
+## Browser-login generation
+
+The human opens the relevant pages in the CLI-owned browser and confirms in the terminal. Discovery uses the rendered page and the same context's request API for authenticated source reads. Third-party assets use a separate empty request context. Observations are bounded and omit headers, variables, login operations and literal-bearing runtime query definitions. Source definitions take precedence over runtime definitions with added `__typename` fields. A credential-free operation descriptor and coverage report are the only durable discovery outputs.
+
+Permission to log in and inspect does not authorize generated mutations. Browser navigation naturally runs the website's own scripts and background requests; the generator does not replay API requests. Generated clients require their own authorized runtime transport later—the CLI does not bake a reusable session into public code.
+
+Advanced noninteractive integrations retain `--session-stdin` with runtime JSON `{ origin, headers }`; optional fields are `assetOrigins`, `apiOrigins`, `moduleUrls`, `graphqlEndpoint` (URL or operation map), and reviewed `restEndpoints`. Never put credentials in CLI arguments. This mode is separate from `--login`; manual header capture is not the normal interactive workflow.
 
 ## Explicit write guards
 

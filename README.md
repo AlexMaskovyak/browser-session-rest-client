@@ -1,29 +1,35 @@
 # Browser Session REST Client
 
-Turn a website's discoverable API into a standalone JavaScript client, using an existing authorized browser session when needed.
+Log into a website in a browser opened by the CLI, then generate a standalone JavaScript API client from the pages you visit.
 
-Give it a URL. It reads the page and its JavaScript modules, finds GraphQL operations and static REST calls, and generates callable methods. Generation never executes downloaded code or invokes discovered API operations.
+The command manages the browser session and discovers modules and GraphQL endpoints while you browse. It then generates callable methods and a coverage report. It never replays captured API operations or submits forms on your behalf.
 
 ## Generate a client
 
-Install from this Git repository, then run:
+Run directly from this Git repository:
 
 ```sh
-website-client --url https://example.com/app --output ./example-client
+npx --yes --package=github:AlexMaskovyak/browser-session-rest-client website-client \
+  --url https://example.com/app --output ./example-client --login
 ```
 
-For a logged-in website, the browser integration supplies the current URL and temporary session through stdin:
+Or, from a checkout after `npm ci`:
 
 ```sh
-session-provider | website-client --url https://example.com/app \
-  --output ./example-client --session-stdin
+node src/cli.js --url https://example.com/app --output ./example-client --login
 ```
 
-`session-provider` represents your browser integration, not a bundled login command. The companion agent skill handles this handoff. The CLI does not attach to arbitrary Chrome tabs or extract cookies itself. Credentials never belong in command arguments or generated files.
+1. A separate Chrome window opens. Your normal Chrome profile is not used.
+2. Log in normally, including MFA, and open the relevant pages on the requested website. You enter credentials into the website, not the terminal.
+3. Return to the terminal and press Enter. The CLI discovers and generates the client, then closes its browser session.
 
-The stdin object contains `{ origin, headers }`. Optional fields: `assetOrigins` (approved CDNs), `apiOrigins` (approved REST origins), `moduleUrls` (observed modules), `graphqlEndpoint` (observed endpoint URL or operation-name-to-URL map), and `restEndpoints` (reviewed `{ name, origin, method, pathTemplate }` contracts). No runtime headers, variables or receipt contents enter generated source.
+No copied cookies, DevTools commands, or session-provider program are required. Ctrl+C cancels and closes the owned session. The command requires an interactive terminal. Choose a new output directory; existing clients are never overwritten, and this is checked before opening the browser.
 
-Flags: `--graphql-endpoint`; repeatable `--asset-origin`, `--operation`, `--keyword`; `--max-modules` (default 80); `--browser-compatible` for the optional Chrome-fingerprint transport. Assets receive no application credentials. Existing output directories are never overwritten.
+Chrome must be installed. Alternatives: `--browser msedge`, or install Playwright Chromium with `npx playwright-core@1.56.0 install chromium` and use `--browser chromium`. The Playwright library is included automatically; no extension or remote-debugging setup is needed.
+
+The session is temporary: no saved login, storage-state, HAR or credential export is created by the tool. Browser-managed temporary profile files are cleaned on normal close; forced termination can leave temporary browser files. Fresh runs require login again. Cookies, request headers, login bodies, variables and response data are not copied into the client.
+
+For a public page, omit `--login`. For narrower discovery, use repeatable `--operation`, `--keyword`, or `--max-modules` (default 80). Observed modules and their CDN origins are included automatically in login mode. Advanced integrations can still supply endpoint hints and transient headers; see [transport and collection](docs/transports.md).
 
 ## Use the generated client
 
@@ -39,7 +45,7 @@ For integrations, `generateWebsiteClient({ url, fetch, assetFetch, ...options })
 
 ## Discovery limits
 
-- GraphQL source definitions produce named methods with required-variable checks. Supply an observed GraphQL endpoint; API routes are not guessed.
+- Login mode observes POST GraphQL endpoint mappings automatically. A single shared endpoint can bind additional source operations, but those unexecuted operations are not live-verified. With multiple endpoints, mapped operations are generated and unbound operations are reported as gaps; use narrower browsing or `--graphql-endpoint` to resolve them.
 - Literal `fetch()` calls produce REST scaffolds. Computed URLs, runtime-only calls, custom wrappers and payload semantics require browser evidence and reviewed contracts.
 - `discovery.json` reports sources, failures, remaining modules and bounds. A bounded scan is not complete website coverage. Generated methods are not live-verified until tested through an authorized session.
 
@@ -49,4 +55,4 @@ The workflow is discovery → generation → service-specific validation → aut
 
 Also included: origin-scoped authenticated Fetch, explicitly guarded JSON/binary writes, and atomic hash-verified artifact downloads. Authentication stays in the browser context or process memory. Service-specific rules belong in independent clients.
 
-See [transport and collection](docs/transports.md). Node 18+; Playwright is optional. MIT licensed; npm registry publication is disabled. Tests: `npm test` and `npm run test:worker`.
+See [transport and collection](docs/transports.md). Node 18+. MIT licensed; npm registry publication is disabled. Tests: `npm test` and `npm run test:worker`; `RUN_BROWSER_SMOKE=1 npm test` also tests real Chrome login against a synthetic private site.
