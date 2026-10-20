@@ -1,5 +1,14 @@
 # Plan
 
+## Docker CLI end-to-end verification
+
+- [ ] Build a pinned Linux Playwright image from a restricted Docker context, install dependencies with npm ci, pack/install the actual CLI, and run as a non-root user without host mounts or production credentials.
+- [ ] Drive the installed CLI through a real PTY and headed Chromium under Xvfb. Use a locally trusted synthetic HTTPS login/MFA site; automate its browser UI externally rather than replacing CLI launch/confirmation functions.
+- [ ] Assert login -> authenticated discovery -> terminal Enter -> generated files and callable read methods, plus secret exclusion, zero replayed mutations, cleanup, cancellation, unfinished login and overwrite protection.
+- [ ] Run the Docker suite in an offline disposable container, run existing relevant suites, record exact results, document reproduction, and commit/push coherent changes.
+
+The image owns Node, Linux browser dependencies, Chromium and test drivers. The installed production CLI owns its browser lifecycle and normal interactive prompt. An external test-only CDP observer drives synthetic user input; no production source is instrumented. Certificates, credentials, browser profiles and output remain inside the disposable container. The container has no network beyond loopback, no host filesystem or Docker socket mounts, and no real accounts. Local test CA trust is installed only inside the container. Failures stop the test with nonzero status; existing output must remain unchanged and CLI-owned browsers must close on success/cancellation. These tests establish Linux/container behavior, not production Gusto compatibility.
+
 ## CLI browser login and generation
 
 - [x] Add `--login`: launch an isolated browser, let the user authenticate and browse, then continue on terminal confirmation. Supply Playwright automatically; use installed Chrome by default.
