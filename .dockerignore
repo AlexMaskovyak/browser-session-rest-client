@@ -1,0 +1,15 @@
+**
+!package.json
+!package-lock.json
+!README.md
+!LICENSE
+!src/
+!src/**
+!test/
+!test/**
+!docs/
+!docs/**
+!docker/
+!docker/**
+**/__pycache__/**
+**/*.pyc

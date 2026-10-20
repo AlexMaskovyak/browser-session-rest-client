@@ -18,6 +18,7 @@
   ],
   "scripts": {
     "test": "node --test",
+    "test:docker": "docker build --tag browser-session-rest-client-e2e --file docker/e2e/Dockerfile . && docker run --rm --init --network none --shm-size=1g --cap-drop=ALL --security-opt=no-new-privileges browser-session-rest-client-e2e",
     "test:worker": "python3 -m unittest discover -s test -p '*_test.py'"
   },
   "engines": {
