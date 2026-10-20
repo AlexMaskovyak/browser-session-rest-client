@@ -56,3 +56,5 @@ The workflow is discovery → generation → service-specific validation → aut
 Also included: origin-scoped authenticated Fetch, explicitly guarded JSON/binary writes, and atomic hash-verified artifact downloads. Authentication stays in the browser context or process memory. Service-specific rules belong in independent clients.
 
 See [transport and collection](docs/transports.md). Node 18+. MIT licensed; npm registry publication is disabled. Tests: `npm test` and `npm run test:worker`; `RUN_BROWSER_SMOKE=1 npm test` also tests real Chrome login against a synthetic private site.
+
+For a clean Linux environment, run `npm run test:docker`. It tests the packed CLI's actual interactive login/MFA-to-generation flow under Chromium/Xvfb, without host browser state or callback injection. See [Docker end-to-end tests](docs/docker-tests.md).
