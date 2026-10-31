@@ -5,3 +5,8 @@ coverage/
 staging/
 results.json
 __pycache__/
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
