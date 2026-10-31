@@ -128,7 +128,10 @@ export async function main(args = process.argv.slice(2)) {
   let output;
   try {
     // Reserve before any network request so an existing file cannot cause a write retry.
-    if (flags['--output']) output = await open(flags['--output'], 'wx', 0o600);
+    if (flags['--output']) {
+      try { output = await open(flags['--output'], 'wx', 0o600); }
+      catch (error) { if (error.code === 'EEXIST') fail('Output file already exists. Choose a new --output path. No request was sent.'); throw error; }
+    }
     const run = async fetch => {
       const client = new WebsiteClient({ fetch: async (url, options) => {
         if (new URL(url).origin !== origin) fail('Request origin changed.');
@@ -152,6 +155,6 @@ export async function main(args = process.argv.slice(2)) {
   } finally { await output?.close(); }
 }
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch(error => { if (error.code === 'CLI_USAGE') console.error(error.message); console.error('Operation did not complete. Check flags, input and authentication with --help. For writes, reconcile the website before retrying. A partial output file may remain. No automatic retry was made.'); process.exitCode = 1; });
+  main().catch(error => { if (error.code === 'CLI_USAGE' || ['Invalid operation variables', 'Missing or invalid path parameter', 'Read requests cannot contain a body'].includes(error.message)) console.error(error.message); console.error('Operation did not complete. Check flags, input and authentication with --help. For writes, reconcile the website before retrying. A partial output file may remain. No automatic retry was made.'); process.exitCode = 1; });
 }
 `;
