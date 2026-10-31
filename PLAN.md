@@ -2,8 +2,8 @@
 
 ## Generated command-line clients
 
-- [ ] Generate a runnable CLI and package command for every discovered GraphQL and REST operation. Add top-level and operation-specific help with endpoint, input types, required fields, authentication, read/write behavior and examples.
-- [ ] Support browser login or bounded credentials on standard input, JSON input files, exclusive response downloads and explicit write confirmation. Reuse generated methods rather than implementing a second request builder.
+- [x] Generate a runnable CLI and package command for every generated GraphQL and REST operation. Add top-level and operation-specific help with endpoint, input types, required fields, authentication, read/write behavior and examples.
+- [x] Support browser login or bounded credentials on standard input, JSON input files, exclusive response downloads and explicit write confirmation. Reuse generated methods rather than implementing a second request builder.
 - [ ] Test generated executable help, input validation, authentication isolation, reads, writes, redirects and downloads. Extend the clean-container test to execute the generated CLI after browser login.
 - [ ] Update usage documentation, run full JavaScript/Python/Docker suites, commit focused changes and open a PR. Completion means a generated client can be used from a terminal without writing a custom runner.
 
