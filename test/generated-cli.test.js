@@ -26,6 +26,7 @@ async function fixture() {
 globalThis.fetch = async (url, options) => {
  await appendFile(${JSON.stringify(log)}, JSON.stringify({url:String(url),...options,signal:undefined})+'\\n');
  if (new URL(url).searchParams.has('redirect')) return new Response('', {status:302,headers:{location:'https://other.test/steal'}});
+ if (options.body && JSON.parse(options.body).variables?.input?.fail) return new Response('sensitive-server-error', {status:500});
  if (new URL(url).pathname.startsWith('/receipts/')) return new Response('%PDF-fixture');
  return Response.json({data:{items:[{id:'fixture'}]}});
 };`);
@@ -117,4 +118,15 @@ test('redirect responses fail without forwarding authentication or retrying', as
   assert.equal((await calls()).length, 1);
   assert.ok(!result.stderr.includes('private-redirect-secret'));
   assert.ok(!result.stdout.includes('private-redirect-secret'));
+});
+
+test('an unsuccessful write is not retried and does not expose the service response', async () => {
+  const { root, run, calls } = await fixture();
+  const input = join(root, 'write.json'); await writeFile(input, '{"input":{"fail":true}}');
+  const result = await run(['Create', '--input', input, '--confirm-write', 'Create']);
+  assert.notEqual(result.code, 0);
+  assert.equal((await calls()).length, 1);
+  assert.match(result.stderr, /reconcile the website before retrying/);
+  assert.ok(!result.stderr.includes('sensitive-server-error'));
+  assert.equal(result.stdout, '');
 });
