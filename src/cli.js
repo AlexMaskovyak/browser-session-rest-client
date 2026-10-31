@@ -8,7 +8,7 @@ import { createAuthenticatedFetch, readCredentialsFromStdin } from './authentica
 import { createBrowserCompatibleFetch } from './browser-compatible-fetch.js';
 import { generateWithBrowserLogin } from './browser-login.js';
 
-const usage = 'website-client --url HTTPS_URL --output NEW_DIRECTORY [--login] [--browser chrome|chromium|msedge] [--session-stdin] [--browser-compatible] [--graphql-endpoint HTTPS_URL] [--asset-origin HTTPS_ORIGIN] [--operation NAME] [--keyword TEXT] [--max-modules N]';
+const usage = 'website-client --url HTTPS_URL --output NEW_DIRECTORY [--name PACKAGE_NAME] [--login] [--browser chrome|chromium|msedge] [--session-stdin] [--browser-compatible] [--graphql-endpoint HTTPS_URL] [--asset-origin HTTPS_ORIGIN] [--operation NAME] [--keyword TEXT] [--max-modules N]';
 const usageError = (message) => Object.assign(new Error(message), { code: 'CLI_USAGE' });
 
 export async function main(args = process.argv.slice(2), browserDependencies = {}) {

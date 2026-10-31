@@ -81,7 +81,9 @@ async function withLogin(browserName, run) {
     await page.goto(websiteUrl, { waitUntil: 'domcontentloaded' });
     terminal = createInterface({ input: process.stdin, output: process.stderr });
     terminal.once('SIGINT', cancel);
+    terminal.once('close', cancel);
     await terminal.question('Log in in the browser, open the website, then press Enter here to run the operation. Ctrl+C cancels.\n', { signal: controller.signal });
+    terminal.off('close', cancel);
     terminal.close();
     if (new URL(page.url()).origin !== new URL(websiteUrl).origin || /login|sign.?in|oauth|password/i.test(new URL(page.url()).pathname) || await page.locator('input[type="password"]:visible').count()) fail('Login is not complete.');
     return await run(async (url, options) => {
