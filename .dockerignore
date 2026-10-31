@@ -3,6 +3,12 @@
 !package-lock.json
 !README.md
 !LICENSE
+!pyproject.toml
+!requirements-test.lock
+!python/
+!python/**
+!tests_python/
+!tests_python/**
 !src/
 !src/**
 !test/

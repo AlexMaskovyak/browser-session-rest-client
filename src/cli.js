@@ -8,12 +8,16 @@ import { createAuthenticatedFetch, readCredentialsFromStdin } from './authentica
 import { createBrowserCompatibleFetch } from './browser-compatible-fetch.js';
 import { generateWithBrowserLogin } from './browser-login.js';
 
-const usage = 'website-client --url HTTPS_URL --output NEW_DIRECTORY [--login] [--browser chrome|chromium|msedge] [--session-stdin] [--browser-compatible] [--graphql-endpoint HTTPS_URL] [--asset-origin HTTPS_ORIGIN] [--operation NAME] [--keyword TEXT] [--max-modules N]';
+const usage = 'website-client --url HTTPS_URL --output NEW_DIRECTORY [--name PACKAGE_NAME] [--login] [--browser chrome|chromium|msedge] [--session-stdin] [--browser-compatible] [--graphql-endpoint HTTPS_URL] [--asset-origin HTTPS_ORIGIN] [--operation NAME] [--keyword TEXT] [--max-modules N]';
 const usageError = (message) => Object.assign(new Error(message), { code: 'CLI_USAGE' });
 
 export async function main(args = process.argv.slice(2), browserDependencies = {}) {
   if (args.length === 1 && args[0] === '--help') {
     console.log(usage);
+    console.log('Generate a standalone client with endpoint commands, operation help and JavaScript methods. Requires Node 18+; --login also needs Chrome or installed Chromium.');
+    console.log('Generation reads website definitions and writes a NEW_DIRECTORY. It does not execute discovered endpoint operations. Log in manually in the temporary browser, browse relevant pages, then press Enter.');
+    console.log('Next: cd NEW_DIRECTORY and run node cli.js --help. Run node cli.js OPERATION --help for inputs and authentication. Generated writes require --confirm-write OPERATION.');
+    console.log('--name PACKAGE_NAME sets the generated package command (default website-client). Failed generation may leave partial output; inspect it and choose a new directory before retrying.');
     return;
   }
   const options = {};
@@ -54,7 +58,7 @@ export async function main(args = process.argv.slice(2), browserDependencies = {
   await mkdir(output);
   for (const [relative, source] of Object.entries(result.files)) {
     if (relative.includes('/')) await mkdir(join(output, 'operations'), { recursive: true });
-    await writeFile(join(output, relative), source, { flag: 'wx' });
+    await writeFile(join(output, relative), source, { flag: 'wx', mode: relative === 'cli.js' ? 0o755 : 0o644 });
   }
   console.log(JSON.stringify({ generated: result.report.generatedOperations.length, rest: result.report.reviewedRestEndpoints.length + result.report.staticRestEndpoints.length, unbound: result.report.unboundOperations?.length ?? 0, sources: result.report.sourceCount, bounded: result.report.bounded, failedSources: result.report.failed.length, liveVerified: false }));
 }

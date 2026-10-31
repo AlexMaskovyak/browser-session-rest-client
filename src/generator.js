@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { GENERATED_CLI } from './generated-cli.js';
 import { parse, print } from 'graphql';
 import { discoverModuleReferences, discoverGraphqlDocuments, generateGraphqlOperationModule, discoverStaticFetchEndpoints } from './discovery.js';
 
@@ -112,7 +113,7 @@ export async function generateWebsiteClient({
     const generated = generateGraphqlOperationModule({ documents, operationName, endpoint });
     const descriptor = JSON.parse(generated.slice(generated.indexOf('Object.freeze(') + 14, generated.lastIndexOf(');')));
     const definition = parse(descriptor.query).definitions.find((d) => d.kind === 'OperationDefinition');
-    descriptor.variables = definition.variableDefinitions.map((d) => ({ name: d.variable.name.value, required: d.type.kind === 'NonNullType' && !d.defaultValue }));
+    descriptor.variables = definition.variableDefinitions.map((d) => ({ name: d.variable.name.value, type: print(d.type), required: d.type.kind === 'NonNullType' && !d.defaultValue }));
     operations[operationName] = descriptor;
     generatedNames.push(operationName);
     files[`operations/${operationName}.js`] = generated;
@@ -126,12 +127,13 @@ export async function generateWebsiteClient({
     rest[endpoint.name] = { origin, method: endpoint.method, pathTemplate: endpoint.pathTemplate };
   }
   if (!generatedNames.length && !Object.keys(rest).length) throw new Error('No supported endpoint contracts discovered; inspect runtime requests or provide reviewed REST contracts');
-  files['operations.js'] = `export const operations = ${JSON.stringify(operations, null, 2)};\nexport const restEndpoints = ${JSON.stringify(rest, null, 2)};\n`;
+  files['operations.js'] = `export const websiteUrl = ${JSON.stringify(website.origin + website.pathname)};\nexport const operations = ${JSON.stringify(operations, null, 2)};\nexport const restEndpoints = ${JSON.stringify(rest, null, 2)};\n`;
   files['index.js'] = GENERATED_CLIENT;
-  files['package.json'] = `${JSON.stringify({ name, version: '0.1.0', private: true, type: 'module', exports: './index.js', engines: { node: '>=18' } }, null, 2)}\n`;
+  files['cli.js'] = GENERATED_CLI;
+  files['package.json'] = `${JSON.stringify({ name, version: '0.1.0', private: true, type: 'module', exports: './index.js', bin: { [name]: './cli.js' }, scripts: { start: 'node cli.js' }, dependencies: { 'playwright-core': '1.56.0' }, engines: { node: '>=18' } }, null, 2)}\n`;
   const report = { websiteOrigin: website.origin, sourceCount: sources.length, sourceBytes: bytes, sources, failed, remainingModules: pending.size, bounded: pending.size > 0, discoveredOperations: [...available], generatedOperations: generatedNames, unboundOperations, staticRestEndpoints: staticEndpoints.map((e) => e.name), reviewedRestEndpoints: restEndpoints.map((e) => e.name), liveVerified: false, limitations: ['Passive source inspection only; runtime-only and undiscovered routes may be missing.', 'Static REST methods are scaffolds; runtime payload validation and parameterization require review.', 'Generation never executes endpoint operations. Live compatibility requires an authorized read or separately approved write.'] };
   files['discovery.json'] = `${JSON.stringify(report, null, 2)}\n`;
-  files['README.md'] = `# ${name}\n\nGenerated from inspected website contracts. See discovery.json for coverage and verification limits.\n\nInject an authorized Fetch transport into WebsiteClient. Call named methods with GraphQL variables, or REST input { path, query, body }. Writes require allowMutations: true and per-call { confirmMutation: true }. No automatic retries. Authentication remains caller-owned. Inspect and test domain validation before production use.\n`;
+  files['README.md'] = `# ${name}\n\nRun the website's discovered operations from your terminal, or import WebsiteClient in JavaScript. Node 18+ is required.\n\n## Start here\n\n1. In this generated directory, run \`node cli.js --help\` to list the operation names and whether they read or write data. Help does not contact the website.\n2. Run \`node cli.js OPERATION --help\`, replacing OPERATION with a listed name. This shows its endpoint, required inputs and a command example. Prepare an input.json file with those values from your own records and the website's request schema. Nested input-object fields are not inferred. Do not guess them.\n3. For browser login, run \`npm install\` in this directory. Chrome must be installed. Alternatively run \`npx playwright-core@1.56.0 install chromium\` and add \`--browser chromium\` to the next command. Installation downloads dependencies; it does not submit website data.\n4. Run \`node cli.js OPERATION --input input.json --login\`. This is a command template: replace OPERATION and prepare the file first. Log in in the temporary browser and press Enter in the terminal to send the request. Writes also require \`--confirm-write OPERATION\`. Each invocation starts a fresh login and closes it after the request. No credentials are saved.\n\nYou can also run \`npm start -- --help\`. After \`npm link\`, the package command is \`${name} --help\`. The JavaScript API still accepts an authorized Fetch transport.\n\n## Results and failures\n\nJSON results are printed to stdout and may contain private data. For a REST response such as a PDF, add \`--output NEW_FILE\`. This creates a private new file and never replaces an existing file. Failed downloads may leave partial files; inspect them before retrying. A download does not establish submission, reimbursement or payment.\n\nNo automatic write retries are made. If a write fails, check the website before retrying because it may already have succeeded. If login fails, verify Chrome or install Chromium as above, then start a fresh command. Application-specific CSRF headers and browser challenges may require an authorized custom session; browser login alone does not solve these. Operation help documents the advanced \`--session-stdin\` format. No credential helper is bundled.\n\n## Coverage and JavaScript API\n\nSee discovery.json for missing operations and verification limits. Generating a command does not prove it works with the live website. Raw endpoint commands do not automatically implement multi-step workflows such as uploading a receipt and then creating its expense. Binary upload bodies and service-specific validation still need reviewed service code.\n\nInject an authorized Fetch transport into WebsiteClient and call named methods with GraphQL variables or REST input { path, query, body }. JavaScript writes require allowMutations: true and per-call { confirmMutation: true }. Authentication remains caller-owned.\n`;
   return { files, report };
 }
 
@@ -147,7 +149,7 @@ export class WebsiteClient {
       Object.defineProperty(this, name, { value: (input, options) => this.request(name, input, options) });
     }
   }
-  async request(name, input = {}, { confirmMutation = false } = {}) {
+  async request(name, input = {}, { confirmMutation = false, rawResponse = false } = {}) {
     const operation = Object.hasOwn(operations, name) ? operations[name] : null;
     const rest = Object.hasOwn(restEndpoints, name) ? restEndpoints[name] : null;
     if (!operation && !rest) throw new Error('Unknown operation');
@@ -173,6 +175,7 @@ export class WebsiteClient {
     try { response = await this.fetch(url, {...options, redirect: 'manual'}); }
     catch { throw new Error(mutates ? 'Write outcome unknown; reconcile before retrying' : 'Request transport failed'); }
     if (!response.ok) throw new Error(mutates ? 'Write not verified; reconcile before retrying' : 'Request failed');
+    if (rawResponse && rest) return response;
     if (response.status === 204 || options.method === 'HEAD') return null;
     let result;
     try { result = await response.json(); } catch { throw new Error('Response could not be verified'); }

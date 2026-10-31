@@ -1,5 +1,55 @@
 # Plan
 
+## Python generator rewrite
+
+The Python generator is the product. It must generate standalone Python service
+packages with named endpoint methods, an installed CLI, and operation help. Gusto
+will be generated from that path, with service workflows kept as extensions.
+The JavaScript implementation below is historical and remains available during
+the rewrite. Its completed tests do not establish Python completion.
+
+1. [x] Browser login: install `website-client`, run `website-client login --url
+   HTTPS_URL`, authenticate in a real browser, and finish or cancel cleanly.
+   Test the installed command in Docker with real browser login and MFA.
+2. [ ] Discovery: use that same in-memory browser session to collect bounded,
+   credential-free endpoint definitions. Keep GraphQL operations separate from
+   ordinary HTTP endpoints. Test conflicting mappings and private-data exclusion.
+3. [ ] Generation: emit standalone Python packages, named endpoint commands and
+   useful help. Use Ariadne Codegen when an actual complete GraphQL schema is
+   available; otherwise preserve explicit observed operations without inventing
+   types. Use OpenAPI generation only for a real compatible OpenAPI specification.
+   Treat har2sdk as a reference, not a required runtime or an inferred schema.
+4. [ ] Integration: generate the Gusto endpoint layer, retain service-specific
+   workflows as separate extensions, and verify authenticated reads and complete
+   enumeration. Production writes require separate specific authorization.
+
+Each milestone gets a focused commit and its relevant tests. Run the full
+relevant suite before handoff. Milestone 1 is the current implementation scope;
+it must not be reported as completed discovery, generation, or Gusto integration.
+See ARCHITECTURE.md for the rewrite's ownership and recovery boundaries.
+
+Milestone 1 verification on October 31, 2026: the installed Python command passed
+five real-terminal, headed-browser scenarios in a non-root Linux/arm64 Docker
+container: login with MFA, unfinished login, Ctrl+C, browser closure and SIGTERM.
+The same run passed 24 Python unit tests, 57 earlier JavaScript tests (one opt-in
+test skipped), five transport-worker tests and eight earlier end-to-end scenarios.
+The first Docker run exposed a cancellation hang; deferred signal handling fixes
+it and the complete rerun passed. No production account was used. Python endpoint
+discovery, package generation and Gusto integration remain incomplete.
+
+## Generated command-line clients
+
+- [x] Generate a runnable CLI and package command for every generated GraphQL and REST operation. Add top-level and operation-specific help with endpoint, input types, required fields, authentication, read/write behavior and examples.
+- [x] Support browser login or bounded credentials on standard input, JSON input files, exclusive response downloads and explicit write confirmation. Reuse generated methods rather than implementing a second request builder.
+- [x] Test generated executable help, input validation, authentication isolation, reads, writes, redirects and downloads. Extend the clean-container test to execute the generated CLI after browser login.
+- [x] Update usage documentation, run full JavaScript/Python/Docker suites, commit focused changes and open a PR. Completion means a generated client can be used from a terminal without writing a custom runner.
+
+Review: [PR #1](https://github.com/AlexMaskovyak/browser-session-rest-client/pull/1) is open. It is not merged and does not modify the existing Gusto client.
+
+The generator owns operation descriptions and emits standalone source and help. The generated CLI owns input parsing, temporary browser login and response output. Generated WebsiteClient remains the only request builder. Authentication stays in memory and is restricted to the selected endpoint origin; browser cookies follow browser domain rules. Writes need an operation-specific confirmation flag and are never retried. Output files are created exclusively. Failure closes owned browsers, reports a bounded error and never prints headers or response bodies. GraphQL input-object fields and service-specific multi-request workflows cannot be inferred without schemas or reviewed service code; help must disclose those limits. Existing Gusto code is not changed by regenerating a different directory.
+
+Verification on October 31, 2026: `npm run test:docker` passed on Linux/arm64. The container passed 57 JavaScript tests (one older opt-in smoke test skipped), five Python tests and eight end-to-end scenarios. The generated executable performed browser login/MFA, an authenticated query, a PDF download and one explicitly confirmed mutation against the local synthetic server. Cancellation removed its browser and made no endpoint call. No production accounts were used.
+
 ## Docker CLI end-to-end verification
 
 - [x] Build a digest-pinned Linux Node image with locked Playwright Chromium from a restricted Docker context, install dependencies with npm ci, pack/install the actual CLI, and run as a non-root user without host mounts or production credentials.
