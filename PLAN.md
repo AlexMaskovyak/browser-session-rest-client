@@ -8,7 +8,7 @@ will be generated from that path, with service workflows kept as extensions.
 The JavaScript implementation below is historical and remains available during
 the rewrite. Its completed tests do not establish Python completion.
 
-1. [ ] Browser login: install `website-client`, run `website-client login --url
+1. [x] Browser login: install `website-client`, run `website-client login --url
    HTTPS_URL`, authenticate in a real browser, and finish or cancel cleanly.
    Test the installed command in Docker with real browser login and MFA.
 2. [ ] Discovery: use that same in-memory browser session to collect bounded,
@@ -27,6 +27,15 @@ Each milestone gets a focused commit and its relevant tests. Run the full
 relevant suite before handoff. Milestone 1 is the current implementation scope;
 it must not be reported as completed discovery, generation, or Gusto integration.
 See ARCHITECTURE.md for the rewrite's ownership and recovery boundaries.
+
+Milestone 1 verification on October 31, 2026: the installed Python command passed
+five real-terminal, headed-browser scenarios in a non-root Linux/arm64 Docker
+container: login with MFA, unfinished login, Ctrl+C, browser closure and SIGTERM.
+The same run passed 24 Python unit tests, 57 earlier JavaScript tests (one opt-in
+test skipped), five transport-worker tests and eight earlier end-to-end scenarios.
+The first Docker run exposed a cancellation hang; deferred signal handling fixes
+it and the complete rerun passed. No production account was used. Python endpoint
+discovery, package generation and Gusto integration remain incomplete.
 
 ## Generated command-line clients
 

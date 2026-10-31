@@ -37,7 +37,8 @@ class BrowserSession:
         self._url = url
         self._browser_name = browser
         self._manager = self._browser = self._context = self._page = None
-        self._previous_term = None
+        self._previous_signals = {}
+        self._cancelled = False
 
     def __repr__(self):
         return "<BrowserSession temporary; credentials not exported>"
@@ -47,11 +48,13 @@ class BrowserSession:
             from playwright.sync_api import sync_playwright
 
             if threading.current_thread() is threading.main_thread():
-                self._previous_term = signal.signal(signal.SIGTERM, self._terminate)
+                for event in (signal.SIGINT, signal.SIGTERM):
+                    self._previous_signals[event] = signal.signal(event, self._cancel)
             self._manager = sync_playwright().start()
             self._browser = self._manager.chromium.launch(
                 headless=False,
                 channel=None if self._browser_name == "chromium" else self._browser_name,
+                handle_sigint=False, handle_sigterm=False,
             )
             self._context = self._browser.new_context(accept_downloads=False)
             self._page = self._context.new_page()
@@ -74,11 +77,14 @@ class BrowserSession:
             self.close()
             raise LoginError("Could not open the website. Check its address and connection, then retry.") from None
 
-    @staticmethod
-    def _terminate(_signum, _frame):
-        raise KeyboardInterrupt()
+    def _cancel(self, _signum, _frame):
+        # Do not interrupt Playwright inside a greenlet switch. The main loop
+        # raises after its short browser event-pump call has returned.
+        self._cancelled = True
 
     def _check_open(self):
+        if self._cancelled:
+            raise KeyboardInterrupt()
         if not self._browser.is_connected() or self._page.is_closed():
             raise LoginError("The login browser closed. Run the command again to start a fresh session.")
 
@@ -137,9 +143,9 @@ class BrowserSession:
                 except Exception:
                     pass
         self._context = self._browser = self._manager = self._page = None
-        if self._previous_term is not None:
-            signal.signal(signal.SIGTERM, self._previous_term)
-            self._previous_term = None
+        for event, previous in self._previous_signals.items():
+            signal.signal(event, previous)
+        self._previous_signals.clear()
 
     def __exit__(self, *_args):
         self.close()

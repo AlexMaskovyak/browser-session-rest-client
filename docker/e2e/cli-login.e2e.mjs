@@ -109,6 +109,60 @@ test('installed CLI: clean Linux container, real PTY, headed Chromium and truste
   const site = await startPrivateSite();
   const root = await mkdtemp(join(tmpdir(), 'website-client-docker-e2e-'));
   try {
+    for (const outcome of ['success', 'unfinished', 'cancelled', 'closed', 'terminated']) {
+      await suite.test(`Python generator login: real browser and terminal, ${outcome}`, async () => {
+        site.reset();
+        const baseline = await profiles();
+        const process = startCli(site, null, {
+          executable: '/opt/website-client-python/bin/website-client',
+          args: ['login', '--url', site.url, '--browser', 'chromium'],
+          prompt: 'press Enter here to finish'
+        });
+        let driver;
+        try {
+          await process.prompt();
+          const attached = await browserPage(site); driver = attached.driver;
+          if (outcome === 'success') {
+            await authenticate(attached.page, site);
+            process.enter();
+          } else if (outcome === 'unfinished') process.enter();
+          else if (outcome === 'cancelled') process.cancel();
+          else if (outcome === 'terminated') {
+            // Signal the actual CLI, not the terminal bridge, and require its cleanup.
+            const pythonCli = [];
+            for (const entry of await readdir('/proc')) {
+              if (!/^\d+$/.test(entry)) continue;
+              try {
+                const command = await readFile(`/proc/${entry}/cmdline`, 'utf8');
+                const argv = command.split('\0');
+                if (argv[1] === '/opt/website-client-python/bin/website-client' && argv[2] === 'login') pythonCli.push(Number(entry));
+              } catch { /* Processes can exit while enumerating. */ }
+            }
+            assert.equal(pythonCli.length, 1);
+            globalThis.process.kill(pythonCli[0], 'SIGTERM');
+          } else {
+            const session = await driver.newBrowserCDPSession();
+            await session.send('Browser.close');
+          }
+          const result = await process.wait();
+          if (outcome === 'success') {
+            assert.equal(result.code, 0, process.transcript());
+            assert.match(process.transcript(), /"sessionReady": true/);
+            assert.match(process.transcript(), /"sessionClosed": true/);
+            assert.match(process.transcript(), /"apiVerified": false/);
+            assert.equal(site.counts.passwordLogins, 1);
+            assert.equal(site.counts.mfaLogins, 1);
+            assert.equal(site.counts.reads, 1, 'Only the normal website read runs');
+          } else assert.notEqual(result.code, 0, process.transcript());
+          assert.equal(site.counts.mutations, 0);
+          for (const [name, secret] of Object.entries(site.secrets)) {
+            if (name !== 'otp') assert.ok(!process.transcript().includes(secret), `Login output leaked ${name}`);
+          }
+          await noOwnedBrowser(baseline);
+        } finally { await process.stop(); await driver?.close().catch(() => {}); }
+      });
+    }
+
     await suite.test('login + MFA + terminal Enter generates a callable client without secrets or mutation replay', async () => {
       site.reset();
       const output = join(root, 'client');

@@ -42,3 +42,24 @@ Containers are removed after execution; the reusable test image and Docker build
 On October 31, 2026, `npm run test:docker` completed with exit status 0 on Linux/arm64 with Node 22.23.3 and Chromium 141.0.7390.37. All eight end-to-end scenarios passed, including execution of the generated CLI. The same container passed 57 JavaScript tests (one older opt-in smoke test skipped) and all five Python worker tests. The generated command read real local GraphQL data, downloaded the synthetic PDF and performed exactly one explicitly confirmed local mutation. Generation itself replayed no mutation. No production accounts were used. Linux/amd64 was not exercised.
 
 On October 20, 2026, `npm run test:docker` completed with exit status 0 using Docker Desktop's Linux/arm64 engine, Node 22.23.3 and Chromium 141.0.7390.37 (Playwright build 1194). All six interactive scenarios passed. The same container also passed 50 JavaScript tests (the older opt-in Mac smoke test was skipped) and all five Python worker tests. Linux/amd64 and production websites were not exercised in this run.
+
+## Python login milestone
+
+`npm run test:docker` also builds and installs the Python wheel into a separate
+environment. Its `website-client login` executable runs through a real terminal
+and headed Chromium. The external test driver completes synthetic HTTPS login
+and MFA, then sends Enter or Ctrl+C through the terminal. No login callback or
+application transport is substituted.
+
+On October 31, 2026, the full Linux/arm64 run passed 24 Python tests, five Python
+login scenarios, 57 earlier JavaScript tests (one opt-in test skipped), five
+transport-worker tests and eight earlier end-to-end scenarios. Python scenarios
+cover successful login, unfinished login, Ctrl+C, closing the browser and SIGTERM.
+They assert private output, no replayed business mutation and cleanup of the
+owned browser listener and temporary profile. The container has no host mounts
+or external network during execution. Node remains present for the earlier
+implementation and synthetic test server; the Python command uses Python
+Playwright and its bundled internal driver.
+
+This establishes the Python login milestone, not Python endpoint discovery or
+client generation, and does not establish compatibility with a production site.

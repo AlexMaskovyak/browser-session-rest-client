@@ -107,6 +107,16 @@ def test_keyboard_interrupt_closes_browser(browser, monkeypatch):
     browser.owned.close.assert_called_once()
 
 
+def test_signals_defer_cancellation_until_between_browser_calls(browser):
+    previous = signal.getsignal(signal.SIGINT)
+    with BrowserSession("https://example.test/app") as session:
+        signal.getsignal(signal.SIGINT)(signal.SIGINT, None)
+        with pytest.raises(KeyboardInterrupt):
+            session._check_open()
+    assert signal.getsignal(signal.SIGINT) == previous
+    browser.owned.close.assert_called_once()
+
+
 def test_cli_refuses_pipes_before_launch(browser, monkeypatch):
     monkeypatch.setattr(sys, "stdin", io.StringIO("\n"))
     assert main(["login", "--url", "https://example.test/app"]) == 1
