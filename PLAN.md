@@ -5,7 +5,9 @@
 - [x] Generate a runnable CLI and package command for every generated GraphQL and REST operation. Add top-level and operation-specific help with endpoint, input types, required fields, authentication, read/write behavior and examples.
 - [x] Support browser login or bounded credentials on standard input, JSON input files, exclusive response downloads and explicit write confirmation. Reuse generated methods rather than implementing a second request builder.
 - [x] Test generated executable help, input validation, authentication isolation, reads, writes, redirects and downloads. Extend the clean-container test to execute the generated CLI after browser login.
-- [ ] Update usage documentation, run full JavaScript/Python/Docker suites, commit focused changes and open a PR. Completion means a generated client can be used from a terminal without writing a custom runner.
+- [x] Update usage documentation, run full JavaScript/Python/Docker suites, commit focused changes and open a PR. Completion means a generated client can be used from a terminal without writing a custom runner.
+
+Review: [PR #1](https://github.com/AlexMaskovyak/browser-session-rest-client/pull/1) is open. It is not merged and does not modify the existing Gusto client.
 
 The generator owns operation descriptions and emits standalone source and help. The generated CLI owns input parsing, temporary browser login and response output. Generated WebsiteClient remains the only request builder. Authentication stays in memory and is restricted to the selected endpoint origin; browser cookies follow browser domain rules. Writes need an operation-specific confirmation flag and are never retried. Output files are created exclusively. Failure closes owned browsers, reports a bounded error and never prints headers or response bodies. GraphQL input-object fields and service-specific multi-request workflows cannot be inferred without schemas or reviewed service code; help must disclose those limits. Existing Gusto code is not changed by regenerating a different directory.
 
