@@ -36,10 +36,10 @@ export async function startPrivateSite() {
   const schema = buildSchema('type Item { id: ID! } input ItemInput { label: String } type Query { items(first: Int): [Item!]! } type Mutation { create(input: ItemInput!): Item! }');
   const rootValue = {
     items: () => { counts.reads++; return [{ id: secrets.response }]; },
-    create: () => { counts.mutations++; return { id: 'unexpected-mutation' }; }
+    create: () => { counts.mutations++; return { id: 'created-fixture-item' }; }
   };
   const source = `const definition={body:\`query List($first: Int) { items(first: $first) { id } } mutation Create($input: ItemInput!) { create(input: $input) { id } }\`};
-fetch('/graphql?operationName=List',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({operationName:'List',query:'query List($first: Int) { items(first: $first) { id } }',variables:{first:10,privateValue:${JSON.stringify(secrets.variable)}}})});`;
+fetch('/graphql?operationName=List',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({operationName:'List',query:'query List($first: Int) { items(first: $first) { id } }',variables:{first:10,privateValue:${JSON.stringify(secrets.variable)}}})}); fetch('/receipt.pdf');`;
   const form = (mfa) => mfa ? '<form method="POST" action="/login/mfa"><label>Verification code<input name="code" autocomplete="one-time-code"></label><button>Verify</button></form>' : '<form method="POST" action="/login"><label>Username<input name="username"></label><label>Password<input name="password" type="password"></label><button>Sign in</button></form>';
   const server = createServer({ key: await readFile(key), cert: await readFile(cert) }, (request, response) => {
     const path = new URL(request.url, 'https://localhost').pathname;
@@ -84,6 +84,7 @@ fetch('/graphql?operationName=List',{method:'POST',headers:{'content-type':'appl
       }); return;
     }
     if (path === '/favicon.ico') { response.writeHead(204); response.end(); return; }
+    if (path === '/receipt.pdf') { response.setHeader('content-type', 'application/pdf'); response.end('%PDF-container-fixture'); return; }
     html(`<h1>Private app</h1><p>${secrets.username}</p><script src="/private-client.js"></script>`);
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));

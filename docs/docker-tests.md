@@ -6,7 +6,7 @@ From the repository root:
 npm run test:docker
 ```
 
-Requires a running Docker engine. The command builds a Linux image, runs all normal JavaScript and Python worker tests, then runs six interactive CLI end-to-end scenarios. The image uses a digest-pinned Node 22 Debian base, `npm ci`, and the Chromium revision selected by the locked Playwright version. No host Node installation, browser, profile or node_modules directory is used by the tests.
+Requires npm and a running Docker engine. The command builds a Linux image, runs all normal JavaScript and Python worker tests, then runs eight CLI end-to-end scenarios, including interactive browser login. The image uses a digest-pinned Node 22 Debian base, `npm ci`, and the Chromium revision selected by the locked Playwright version. Host Node launches the Docker command only; the tests use no host browser, profile or node_modules directory. A nonzero exit means verification failed; inspect the failed test before retrying. The command changes local Docker images and cache, not production accounts.
 
 ## What runs
 
@@ -15,15 +15,19 @@ The image packs the repository and installs that tarball into `/opt/website-clie
 The synthetic HTTPS site has a container-local CA trusted by Chromium and the CLI's Node process. TLS checks are not bypassed. Its GraphQL endpoint executes against a real schema. The scenarios assert:
 
 1. Login + MFA → authenticated private-source discovery → terminal Enter → generated files → a working generated read method.
-2. A fresh CLI run starts logged out and cannot generate before login completes.
-3. Ctrl+C cancels through the real terminal and removes the owned browser/profile.
-4. Closing the login browser exits without creating a client.
-5. Existing output is preserved and rejected before browser startup.
-6. Piped stdin is rejected as noninteractive, with no output or surviving browser.
+2. The generated CLI shows operation help, opens a fresh browser for login and MFA, then executes a real read after terminal confirmation. No custom runner or injected transport is used for this command.
+3. Cancelling the generated CLI's browser login closes its browser without calling an endpoint.
+4. A fresh generator run starts logged out and cannot generate before login completes.
+5. Ctrl+C cancels through the real terminal and removes the owned browser/profile.
+6. Closing the login browser exits without creating a client.
+7. Existing output is preserved and rejected before browser startup.
+8. Piped stdin is rejected as noninteractive, with no output or surviving browser.
 
 The successful path also checks that generated files exclude synthetic credentials, cookies, request variables and response data; mutation replay stays at zero; generation waits for terminal confirmation; and the browser listener and temporary profile are removed.
 
 After generation closes the login browser, the generated client is imported and given a fixture-authenticated HTTPS transport through its normal Fetch interface. Its read method calls the real local GraphQL server; no canned response is substituted. This checks the generated method, not persistence of the browser session. Mutations remain disabled by default. An exit deadline fails the test rather than turning a forced termination into a successful cleanup assertion.
+
+The next scenario tests the generated executable itself. Its browser library is installed offline from the container's existing dependency, then the executable performs its own login and read. It also downloads synthetic PDF bytes and executes one explicitly confirmed write against the local server, using fixture session credentials through standard input. No production write occurs. This is separate from the imported JavaScript method test above. The normal JavaScript suite also launches generated commands to check write confirmation, invalid input, authentication scope, binary downloads, private output permissions and failure without retries. Those focused tests use synthetic responses; the interactive Docker scenario uses the real local HTTPS server.
 
 ## Isolation and limits
 
@@ -34,5 +38,7 @@ No production account or Gusto endpoint is involved. Passing establishes the ins
 Containers are removed after execution; the reusable test image and Docker build cache remain. All test credentials, certificates and generated clients are created inside the disposable container, not the checkout.
 
 ## Recorded verification
+
+On October 31, 2026, `npm run test:docker` completed with exit status 0 on Linux/arm64 with Node 22.23.3 and Chromium 141.0.7390.37. All eight end-to-end scenarios passed, including execution of the generated CLI. The same container passed 57 JavaScript tests (one older opt-in smoke test skipped) and all five Python worker tests. The generated command read real local GraphQL data, downloaded the synthetic PDF and performed exactly one explicitly confirmed local mutation. Generation itself replayed no mutation. No production accounts were used. Linux/amd64 was not exercised.
 
 On October 20, 2026, `npm run test:docker` completed with exit status 0 using Docker Desktop's Linux/arm64 engine, Node 22.23.3 and Chromium 141.0.7390.37 (Playwright build 1194). All six interactive scenarios passed. The same container also passed 50 JavaScript tests (the older opt-in Mac smoke test was skipped) and all five Python worker tests. Linux/amd64 and production websites were not exercised in this run.

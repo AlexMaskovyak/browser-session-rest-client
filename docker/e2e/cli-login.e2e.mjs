@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { request as httpsRequest } from 'node:https';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -29,10 +29,9 @@ async function noOwnedBrowser(baseline) {
   await eventually(async () => (await profiles()).every((name) => baseline.includes(name)), 'CLI-owned temporary profile was not removed');
 }
 
-function startCli(site, output, { interactive = true } = {}) {
-  const args = ['--url', site.url, '--output', output, '--login', '--browser', 'chromium'];
-  const child = interactive ? spawn('python3', ['docker/e2e/terminal_bridge.py', cli, ...args], { env: { ...process.env, NODE_EXTRA_CA_CERTS: site.rootCert } }) :
-    spawn(cli, args, { env: { ...process.env, NODE_EXTRA_CA_CERTS: site.rootCert } });
+function startCli(site, output, { interactive = true, executable = cli, args = ['--url', site.url, '--output', output, '--login', '--browser', 'chromium'], prompt = 'press Enter here to generate' } = {}) {
+  const child = interactive ? spawn('python3', ['docker/e2e/terminal_bridge.py', executable, ...args], { env: { ...process.env, NODE_EXTRA_CA_CERTS: site.rootCert } }) :
+    spawn(executable, args, { env: { ...process.env, NODE_EXTRA_CA_CERTS: site.rootCert } });
   let transcript = '';
   for (const stream of [child.stdout, child.stderr]) stream.on('data', (chunk) => { transcript += chunk; if (transcript.length > 512 * 1024) child.kill('SIGTERM'); });
   let status;
@@ -43,7 +42,7 @@ function startCli(site, output, { interactive = true } = {}) {
       const deadline = Date.now() + 15000;
       while (Date.now() < deadline) {
         if (status) throw new Error(`CLI exited before terminal login prompt: ${transcript}`);
-        if (transcript.includes('press Enter here to generate')) return;
+        if (transcript.includes(prompt)) return;
         await delay(75);
       }
       throw new Error(`CLI did not reach its real interactive login prompt: ${transcript}`);
@@ -143,6 +142,67 @@ test('installed CLI: clean Linux container, real PTY, headed Chromium and truste
         assert.equal(site.counts.reads, 2);
         assert.equal(site.counts.mutations, 0);
       } finally { await process.stop(); await driver?.close().catch(() => {}); }
+    });
+
+    await suite.test('generated CLI help and browser login execute a discovered endpoint without a custom runner', async () => {
+      const output = join(root, 'client');
+      const executable = join(output, 'cli.js');
+      const help = execFileSync('node', [executable, 'List', '--help'], { encoding: 'utf8' });
+      assert.match(help, /first: Int \(optional\)/);
+      assert.match(help, /READS remote data/);
+      // Install the generated package's browser dependency from the container's
+      // existing package, offline. Nothing from the host is mounted or reused.
+      execFileSync('npm', ['install', '--prefix', output, '--offline', '--ignore-scripts', '--install-links', '/work/node_modules/playwright-core'], { stdio: 'pipe' });
+      site.reset();
+      const baseline = await profiles();
+      const process = startCli(site, null, { executable, args: ['List', '--login', '--browser', 'chromium'], prompt: 'press Enter here to run the operation' });
+      let driver;
+      try {
+        await process.prompt();
+        const attached = await browserPage(site); driver = attached.driver;
+        await authenticate(attached.page, site);
+        process.enter();
+        assert.equal((await process.wait()).code, 0, process.transcript());
+        assert.match(process.transcript(), new RegExp(site.secrets.response));
+        assert.equal(site.counts.reads, 2, 'One normal browser read plus one generated CLI call');
+        assert.equal(site.counts.mutations, 0);
+        assert.equal(site.counts.mfaLogins, 1);
+        await noOwnedBrowser(baseline);
+        const { restEndpoints } = await import(pathToFileURL(join(output, 'operations.js')));
+        const downloadName = Object.keys(restEndpoints).find(name => restEndpoints[name].pathTemplate === '/receipt.pdf');
+        assert.ok(downloadName, 'Static PDF endpoint must have a CLI command');
+        const session = JSON.stringify({ origin: site.origin, headers: { cookie: 'session=' + site.secrets.cookie } });
+        const download = join(root, 'download.pdf');
+        const pdf = startCli(site, null, { interactive: false, executable, args: [downloadName, '--session-stdin', '--output', download] });
+        try {
+          pdf.child.stdin.end(session);
+          assert.equal((await pdf.wait()).code, 0, pdf.transcript());
+          assert.equal(await readFile(download, 'utf8'), '%PDF-container-fixture');
+        } finally { await pdf.stop(); }
+        const input = join(root, 'create.json');
+        await writeFile(input, JSON.stringify({ input: { label: 'Container-only example' } }));
+        const write = startCli(site, null, { interactive: false, executable, args: ['Create', '--input', input, '--session-stdin', '--confirm-write', 'Create'] });
+        try {
+          write.child.stdin.end(session);
+          assert.equal((await write.wait()).code, 0, write.transcript());
+          assert.match(write.transcript(), /created-fixture-item/);
+          assert.equal(site.counts.mutations, 1, 'Only the explicitly confirmed synthetic write runs');
+        } finally { await write.stop(); }
+      } finally { await process.stop(); await driver?.close().catch(() => {}); }
+    });
+
+    await suite.test('generated CLI cancellation closes its browser without calling an endpoint', async () => {
+      site.reset();
+      const baseline = await profiles();
+      const executable = join(root, 'client', 'cli.js');
+      const process = startCli(site, null, { executable, args: ['List', '--login', '--browser', 'chromium'], prompt: 'press Enter here to run the operation' });
+      try {
+        await process.prompt(); process.cancel();
+        assert.notEqual((await process.wait()).code, 0);
+        assert.equal(site.counts.reads, 0);
+        assert.equal(site.counts.mutations, 0);
+        await noOwnedBrowser(baseline);
+      } finally { await process.stop(); }
     });
 
     await suite.test('a new CLI run starts logged out; unfinished login cannot generate a client', async () => {
