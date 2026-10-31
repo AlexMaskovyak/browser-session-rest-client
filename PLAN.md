@@ -1,5 +1,33 @@
 # Plan
 
+## Python generator rewrite
+
+The Python generator is the product. It must generate standalone Python service
+packages with named endpoint methods, an installed CLI, and operation help. Gusto
+will be generated from that path, with service workflows kept as extensions.
+The JavaScript implementation below is historical and remains available during
+the rewrite. Its completed tests do not establish Python completion.
+
+1. [ ] Browser login: install `website-client`, run `website-client login --url
+   HTTPS_URL`, authenticate in a real browser, and finish or cancel cleanly.
+   Test the installed command in Docker with real browser login and MFA.
+2. [ ] Discovery: use that same in-memory browser session to collect bounded,
+   credential-free endpoint definitions. Keep GraphQL operations separate from
+   ordinary HTTP endpoints. Test conflicting mappings and private-data exclusion.
+3. [ ] Generation: emit standalone Python packages, named endpoint commands and
+   useful help. Use Ariadne Codegen when an actual complete GraphQL schema is
+   available; otherwise preserve explicit observed operations without inventing
+   types. Use OpenAPI generation only for a real compatible OpenAPI specification.
+   Treat har2sdk as a reference, not a required runtime or an inferred schema.
+4. [ ] Integration: generate the Gusto endpoint layer, retain service-specific
+   workflows as separate extensions, and verify authenticated reads and complete
+   enumeration. Production writes require separate specific authorization.
+
+Each milestone gets a focused commit and its relevant tests. Run the full
+relevant suite before handoff. Milestone 1 is the current implementation scope;
+it must not be reported as completed discovery, generation, or Gusto integration.
+See ARCHITECTURE.md for the rewrite's ownership and recovery boundaries.
+
 ## Generated command-line clients
 
 - [x] Generate a runnable CLI and package command for every generated GraphQL and REST operation. Add top-level and operation-specific help with endpoint, input types, required fields, authentication, read/write behavior and examples.
